@@ -1,0 +1,2058 @@
+1:import { Student, LanguageCode, AvatarState, AcademicResult, ClassTimetable } from '../types';
+2:import { SchoolDataService } from './schoolDataService';
+3:import { SpeechService } from './speechService';
+4:import { LanguageDetectionService, TextToSpeechService } from './speech';
+5:import { HomeworkService, matchesSubject } from './homeworkService';
+7:// ==========================================
+8:// 1. INTENT & CONTEXT DATA MODEL
+9:// ==========================================
+11:export type AIIntent =
+12:  | 'HOMEWORK_TODAY'
+13:  | 'HOMEWORK_TOMORROW'
+14:  | 'HOMEWORK_DATE'
+15:  | 'EXAM_SCHEDULE'
+16:  | 'ATTENDANCE'
+17:  | 'ACADEMIC_PROGRESS'
+18:  | 'HOLIDAY_INFORMATION'
+19:  | 'TIMETABLE'
+20:  | 'ANNOUNCEMENT'
+21:  | 'STUDENT_INFORMATION'
+22:  | 'SWITCH_CHILD'
+23:  | 'HELP'
+24:  | 'UNKNOWN'
+25:  // Backward-compatibility aliases
+26:  | 'SCHOOL_ANNOUNCEMENT'
+27:  | 'CHILD_INFORMATION'
+28:  | 'GENERAL_SCHOOL_INFORMATION'
+29:  | 'UNCLEAR_INPUT';
+31:export type ProcessingStage = 'understanding' | 'checking_records' | 'preparing_response';
+33:export interface ConversationTurn {
+34:  sender: 'user' | 'assistant';
+35:  text: string;
+36:  intent?: AIIntent;
+37:  studentId?: string;
+38:  language?: LanguageCode;
+39:  timestamp: number;
+40:}
+42:export interface ConversationContext {
+43:  lastIntent?: AIIntent;
+44:  lastStudentId?: string;
+45:  lastStudentName?: string;
+46:  lastSubject?: string;
+47:  lastDateReference?: string;
+48:  lastLanguage?: LanguageCode;
+49:}
+51:export interface IntentDetectionResult {
+52:  intent: AIIntent;
+53:  confidence: number;
+54:  extractedSubject?: string;
+55:  dateReference?: 'today' | 'tomorrow' | 'upcoming' | string;
+56:  rawQuery: string;
+57:  isSequentialFollowUp?: boolean;
+58:}
+60:export interface StudentResolutionResult {
+61:  mode: 'single' | 'multi' | 'all' | 'unclear';
+62:  students: Student[];
+63:  clarificationPrompt?: Record<LanguageCode, string>;
+64:}
+66:export interface StructuredQueryAnalysis {
+67:  intent: AIIntent;
+68:  student?: Student | null;
+69:  students: Student[];
+70:  isMultiChild: boolean;
+71:  date?: string;
+72:  subject?: string;
+73:  language: LanguageCode;
+74:  confidence: number;
+75:  rawQuery: string;
+76:}
+78:export interface AIResponseResult {
+79:  query: string;
+80:  intent: AIIntent;
+81:  studentId?: string;
+82:  studentName?: string;
+83:  isMultiChild: boolean;
+84:  spokenResponse: string;
+85:  displayResponse: string;
+86:  avatarMood: AvatarState;
+87:  detailedData?: any;
+88:  context: ConversationContext;
+89:  detectedLanguage?: LanguageCode;
+90:  isAutoDetected?: boolean;
+91:  analysis?: StructuredQueryAnalysis;
+92:  switchChildId?: string;
+93:}
+95:export interface VoiceQueryOptions {
+96:  autoDetectLanguage?: boolean;
+97:  preferredLanguage?: LanguageCode;
+98:  voiceSpeed?: 'slow' | 'normal';
+99:  onProgress?: (stage: ProcessingStage) => void;
+100:}
+102:// Subject normalization dictionary
+103:const KNOWN_SUBJECTS: Record<string, string> = {
+104:  maths: 'Mathematics',
+105:  math: 'Mathematics',
+106:  mathematics: 'Mathematics',
+107:  ganit: 'Mathematics',
+108:  'गणित': 'Mathematics',
+109:  'ਹਿਸਾਬ': 'Mathematics',
+110:  'গণিত': 'Mathematics',
+111:  'கணிதம்': 'Mathematics',
+112:  'గణితం': 'Mathematics',
+113:  
+114:  science: 'Science',
+115:  vigyan: 'Science',
+116:  vigyaan: 'Science',
+117:  'विज्ञान': 'Science',
+118:  'ਵਿਗਿਆਨ': 'Science',
+119:  'বিজ্ঞান': 'Science',
+120:  'அறிவியல்': 'Science',
+121:  'సైన్స్': 'Science',
+122:  
+123:  english: 'English',
+124:  angrezi: 'English',
+125:  angreji: 'English',
+126:  'अंग्रेजी': 'English',
+127:  'ਅੰਗਰੇਜ਼ੀ': 'English',
+128:  'ইংরেজি': 'English',
+129:  'ஆங்கிலம்': 'English',
+130:  'ఇంగ్లీష్': 'English',
+131:  
+132:  hindi: 'Hindi',
+133:  'हिन्दी': 'Hindi',
+134:  'हिंदी': 'Hindi',
+135:  
+136:  social: 'Social Studies',
+137:  'social studies': 'Social Studies',
+138:  'social science': 'Social Studies',
+139:  sst: 'Social Studies',
+140:  'सामाजिक विज्ञान': 'Social Studies',
+141:  samajik: 'Social Studies',
+142:  
+143:  evs: 'Environmental Studies',
+144:  environmental: 'Environmental Studies',
+145:  paryavaran: 'Environmental Studies',
+146:  'पर्यावरण': 'Environmental Studies',
+148:  computer: 'Computer',
+149:  computers: 'Computer',
+150:  it: 'Computer',
+151:  'कंप्यूटर': 'Computer',
+152:};
+154:/**
+155: * Extract normalized subject from natural user query
+156: */
+157:export function extractSubject(lowerQuery: string): string | undefined {
+158:  const q = (lowerQuery || '').toLowerCase();
+159:  for (const [key, normalized] of Object.entries(KNOWN_SUBJECTS)) {
+160:    const reg = new RegExp(`(^|\\s|[.,?!])${key.toLowerCase()}($|\\s|[.,?!])`, 'i');
+161:    if (reg.test(q) || q.includes(key.toLowerCase())) {
+162:      return normalized;
+163:    }
+164:  }
+165:  return undefined;
+166:}
+168:/**
+169: * Extract temporal reference (today, tomorrow, weekday, specific date) from query
+170: */
+171:export function extractDateReference(lowerQuery: string): { type: 'today' | 'tomorrow' | 'date'; value: string } | undefined {
+172:  const q = (lowerQuery || '').toLowerCase();
+174:  const tomorrowKeywords = ['tomorrow', 'kal', 'कल', 'उद्या', 'ਕੱਲ੍ਹ', 'আগামীকাল', 'நாளை', 'రేపు', 'આવતીકાલ'];
+175:  const todayKeywords = ['today', 'aaj', 'आज', 'आजचे', 'ਅੱਜ', 'আজ', 'இன்று', 'నేడు', 'આજે'];
+177:  const weekdayMap: Record<string, string> = {
+178:    monday: 'Monday', somwar: 'Monday', 'सोमवार': 'Monday',
+179:    tuesday: 'Tuesday', mangalwar: 'Tuesday', 'मंगलवार': 'Tuesday',
+180:    wednesday: 'Wednesday', budhwar: 'Wednesday', 'बुधवार': 'Wednesday',
+181:    thursday: 'Thursday', guruwar: 'Thursday', veervar: 'Thursday', 'गुरुवार': 'Thursday',
+182:    friday: 'Friday', shukrawar: 'Friday', 'शुक्रवार': 'Friday',
+183:    saturday: 'Saturday', shaniwar: 'Saturday', 'शनिवार': 'Saturday',
+184:    sunday: 'Sunday', raviwar: 'Sunday', itwar: 'Sunday', 'रविवार': 'Sunday',
+185:  };
+187:  // 1. Check tomorrow
+188:  for (const kw of tomorrowKeywords) {
+189:    const reg = new RegExp(`(^|\\s|[.,?!])${kw}($|\\s|[.,?!])`, 'i');
+190:    if (reg.test(q)) {
+191:      return { type: 'tomorrow', value: 'tomorrow' };
+192:    }
+193:  }
+195:  // 2. Check today
+196:  for (const kw of todayKeywords) {
+197:    const reg = new RegExp(`(^|\\s|[.,?!])${kw}($|\\s|[.,?!])`, 'i');
+198:    if (reg.test(q)) {
+199:      return { type: 'today', value: 'today' };
+200:    }
+201:  }
+203:  // 3. Check weekdays
+204:  for (const [kw, dayName] of Object.entries(weekdayMap)) {
+205:    const reg = new RegExp(`(^|\\s|[.,?!])${kw}($|\\s|[.,?!])`, 'i');
+206:    if (reg.test(q)) {
+207:      return { type: 'date', value: dayName };
+208:    }
+209:  }
+211:  // 4. Check explicit dates like "12 October", "3 Oct", "15th November"
+212:  const dateMatch = q.match(/\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|[अआइईउऊऋएऐओऔकखगघचछजझटठडढणतथदधनपफबभमयरलवशषसह]+))/i);
+213:  if (dateMatch) {
+214:    return { type: 'date', value: dateMatch[1] };
+215:  }
+217:  return undefined;
+218:}
+220:// ==========================================
+221:// MULTILINGUAL INDIC NAME & RELATION ALIASES
+222:// ==========================================
+223:const INDIC_NAME_ALIASES: Record<string, string[]> = {
+224:  rohan: [
+225:    'rohan', 'रोहन', 'रोहनचा', 'रोहनची', 'रोहनचे', 'रोहनला', 'रोहनने', 'रोहननं', 'रोहनचं', 'रोहनका', 'रोहनकी', 'रोहनके',
+226:    'রোহন', 'রোহনের', 'রোহানের', 'রোহান', 'রোহান এর', 'রোহন এর',
+227:    'ਰੋਹਨ', 'ਰੋਹਨ ਦਾ', 'ਰੋਹਨ ਦੀ',
+228:    'રોહન', 'રોહનનું', 'રોહનનો',
+229:    'ரோஹன்', 'ரோகனின்', 'ரோஹனின்',
+230:    'రోహన్', 'రోహన్ యొక్క', 'రోహన్‌కి'
+231:  ],
+232:  priya: [
+233:    'priya', 'प्रिया', 'प्रियाचा', 'प्रियाची', 'प्रियाचे', 'प्रियाला', 'प्रियाने', 'प्रियाचं', 'प्रियाका', 'प्रियाकी', 'प्रियाके',
+234:    'প্রিয়া', 'প্রিয়ার', 'প্ৰিয়া', 'প্ৰিয়ার', 'প্রিয়া এর',
+235:    'ਪ੍ਰਿਆ', 'ਪ੍ਰਿਆ ਦਾ', 'ਪ੍ਰਿਆ ਦੀ',
+236:    'પ્રિયા', 'પ્રિયાનું',
+237:    'பிரியா', 'பிரியாவின்',
+238:    'ప్రియా', 'ప్రియా యొక్క', 'ప్రియాకి'
+239:  ],
+240:  aarav: [
+241:    'aarav', 'आरव', 'आरवचा', 'आरवची', 'आरवला', 'आरवका',
+242:    'আরভ', 'আরভের',
+243:    'ਆਰਵ', 'ਆਰਵ ਦਾ',
+244:    'આરવ', 'આરવનું',
+245:    'ஆரவ்',
+246:    'ఆరవ్'
+247:  ],
+248:  kavya: [
+249:    'kavya', 'काव्या', 'काव्याचा', 'काव्याची', 'काव्याला',
+250:    'কাব্যা', 'ਕਾਵਿਆ', 'કાવ્યા', 'காவ்யா', 'కావ్య'
+251:  ],
+252:  vihaan: [
+253:    'vihaan', 'विहान', 'विहानचा', 'विहानची',
+254:    'বিহান', 'ਵਿਹਾਨ', 'વિહાન', 'விஹான்', 'విహాన్'
+255:  ]
+256:};
+258:const DAUGHTER_KEYWORDS = [
+259:  'beti', 'बेटी', 'बिटिया', 'ladki', 'लड़की', 'daughter', 'मुलगी', 'मुलीचा', 'मुलीचे',
+260:  'মেয়ে', 'মেয়ের', 'মেয়েটির', 'ਧੀ', 'ਕੁੜੀ', 'દીકરી', 'மகள்', 'கூతురు'
+261:];
+263:const SON_KEYWORDS = [
+264:  'beta', 'बेटा', 'ladka', 'लड़का', 'son', 'मुलगा', 'मुलाचा', 'मुलाचे',
+265:  'ছেলে', 'ছেলের', 'ছেলেটির', 'ਪੁੱਤਰ', 'ਮੁੰਡਾ', 'દીકરો', 'மகன்', 'కొడుకు'
+266:];
+268:function matchesStudent(s: Student, lowerQuery: string): boolean {
+269:  const firstName = (s.name || s.fullName || '').split(' ')[0].toLowerCase();
+270:  if (!firstName || firstName.length < 2) return false;
+272:  // 1. Exact Latin boundary match
+273:  const latinRegex = new RegExp(`\\b${firstName}\\b`, 'i');
+274:  if (latinRegex.test(lowerQuery)) return true;
+276:  // 2. Multilingual aliases check (Devanagari, Bengali, Gurmukhi, Gujarati, Tamil, Telugu)
+277:  const aliases = INDIC_NAME_ALIASES[firstName];
+278:  if (aliases && aliases.some((alias) => lowerQuery.includes(alias.toLowerCase()))) {
+279:    return true;
+280:  }
+282:  // 3. Fallback: Substring check if word length >= 3
+283:  if (firstName.length >= 3 && lowerQuery.includes(firstName)) {
+284:    return true;
+285:  }
+287:  return false;
+288:}
+290:// In-Memory Multi-turn Conversation Memory
+291:class ConversationMemory {
+292:  private history: ConversationTurn[] = [];
+293:  private context: ConversationContext = {};
+295:  public addTurn(turn: ConversationTurn) {
+296:    this.history.push(turn);
+297:    if (this.history.length > 20) {
+298:      this.history.shift();
+299:    }
+300:  }
+302:  public getContext(): ConversationContext {
+303:    return { ...this.context };
+304:  }
+306:  public getHistory(): ConversationTurn[] {
+307:    return [...this.history];
+308:  }
+310:  public updateContext(updates: Partial<ConversationContext>) {
+311:    this.context = { ...this.context, ...updates };
+312:  }
+314:  public clearContext() {
+315:    this.context = {};
+316:    this.history = [];
+317:  }
+318:}
+320:export const conversationMemory = new ConversationMemory();
+322:// ==========================================
+323:// 2. CORE MULTILINGUAL AI ASSISTANT SERVICE
+324:// ==========================================
+326:export class AIAssistantService {
+327:  /**
+328:   * 1. Detect Intent from natural conversational query (multilingual, phonetic, context-aware)
+329:   * Supported Intents:
+330:   * - HOMEWORK_TODAY
+331:   * - HOMEWORK_TOMORROW
+332:   * - HOMEWORK_DATE
+333:   * - EXAM_SCHEDULE
+334:   * - ATTENDANCE
+335:   * - ACADEMIC_PROGRESS
+336:   * - HOLIDAY_INFORMATION
+337:   * - TIMETABLE
+338:   * - ANNOUNCEMENT
+339:   * - STUDENT_INFORMATION
+340:   * - SWITCH_CHILD
+341:   * - HELP
+342:   * - UNKNOWN
+343:   */
+344:  public static detectIntent(
+345:    rawQuery: string,
+346:    context?: ConversationContext,
+347:    availableStudents?: Student[]
+348:  ): IntentDetectionResult {
+349:    const query = (rawQuery || '').trim();
+350:    const lower = query.toLowerCase();
+352:    // 1. Check for subject mentions
+353:    const extractedSubject = extractSubject(lower);
+355:    // 2. Check for temporal references (today, tomorrow, Friday, 12 October, etc.)
+356:    const dateRef = extractDateReference(lower);
+357:    const isTomorrow = dateRef?.type === 'tomorrow';
+359:    // 3. SWITCH_CHILD Intent
+360:    const hasSwitchKeyword =
+361:      lower.includes('switch') ||
+362:      lower.includes('badlo') ||
+363:      lower.includes('badal do') ||
+364:      lower.includes('बदलो') ||
+365:      lower.includes('स्विच') ||
+366:      lower.includes('shift to') ||
+367:      lower.includes('change to') ||
+368:      lower.includes('chuno') ||
+369:      lower.includes('choono') ||
+370:      lower.includes('चुनो') ||
+371:      lower.includes('pe switch') ||
+372:      lower.includes('par switch') ||
+373:      lower.includes('ko select') ||
+374:      lower.includes('select ') ||
+375:      lower.includes('ko dikhao') ||
+376:      lower.includes('dikhao');
+378:    if (hasSwitchKeyword) {
+379:      return {
+380:        intent: 'SWITCH_CHILD',
+381:        confidence: 0.98,
+382:        extractedSubject,
+383:        rawQuery: query,
+384:      };
+385:    }
+387:    // 4. HELP Intent
+388:    const hasHelpKeyword =
+389:      lower.includes('help') ||
+390:      lower.includes('what can you do') ||
+391:      lower.includes('tum kya kar sakte') ||
+392:      lower.includes('kya kya kar sakte') ||
+393:      lower.includes('madad') ||
+394:      lower.includes('मदद') ||
+395:      lower.includes('sahayata') ||
+396:      lower.includes('सहायता') ||
+397:      lower.includes('how to use') ||
+398:      lower.includes('kaise use') ||
+399:      lower.includes('features') ||
+400:      lower.includes('commands') ||
+401:      lower.includes('options') ||
+402:      lower.includes('मार्गदर्शन');
+404:    if (hasHelpKeyword) {
+405:      return {
+406:        intent: 'HELP',
+407:        confidence: 0.97,
+408:        rawQuery: query,
+409:      };
+410:    }
+412:    // 5. Check for sequential follow-up references
+413:    const isSequentialFollowUp =
+414:      lower.includes('uske baad') ||
+415:      lower.includes('uske agla') ||
+416:      lower.includes('uske bad') ||
+417:      lower.includes('baad wala') ||
+418:      lower.includes('bad wala') ||
+419:      lower.includes('baad ka') ||
+420:      lower.includes('agla exam') ||
+421:      lower.includes('next exam') ||
+422:      lower.includes('exam after') ||
+423:      lower.includes('after that') ||
+424:      lower.includes('subsequent') ||
+425:      lower.includes('त्यानंतरची') ||
+426:      lower.includes('त्यानंतर') ||
+427:      lower.includes('दुसरी परीक्षा') ||
+428:      lower.includes('তার পরের') ||
+429:      lower.includes('এর পরের') ||
+430:      lower.includes('ਅਗਲੀ ਪ੍ਰੀਖਿਆ') ||
+431:      lower.includes('తదుపరి') ||
+432:      lower.includes('அடுத்த தேர்வு');
+434:    // 6. Elliptical Subject Follow-up (e.g. "What about Science?", "Aur Science?", "And Maths?", "Science ka?")
+435:    const isSubjectFollowUp =
+436:      !!extractedSubject &&
+437:      (lower.startsWith('what about') ||
+438:        lower.startsWith('aur ') ||
+439:        lower.startsWith('and ') ||
+440:        lower.startsWith('or ') ||
+441:        lower.includes(' ka?') ||
+442:        lower.includes(' ki?') ||
+443:        lower.includes(' ke?') ||
+444:        lower.includes('ka batao') ||
+445:        lower.trim().split(/\s+/).length <= 4) &&
+446:      !lower.includes('attendance') &&
+447:      !lower.includes('holiday') &&
+448:      !lower.includes('timetable') &&
+449:      !lower.includes('notice');
+451:    if (isSubjectFollowUp && context?.lastIntent) {
+452:      return {
+453:        intent: context.lastIntent,
+454:        confidence: 0.95,
+455:        extractedSubject,
+456:        dateReference: context.lastDateReference,
+457:        rawQuery: query,
+458:      };
+459:    }
+461:    // 7. Elliptical Child Follow-up (e.g. "What about Priya?", "Aur Priya?", "Priya ka?")
+462:    const words = lower.trim().split(/\s+/);
+463:    const isChildFollowUp =
+464:      (lower.startsWith('what about') ||
+465:        lower.startsWith('aur ') ||
+466:        lower.startsWith('and ') ||
+467:        lower.startsWith('or ') ||
+468:        words.length <= 3) &&
+469:      !lower.includes('exam') &&
+470:      !lower.includes('homework') &&
+471:      !lower.includes('attendance') &&
+472:      !lower.includes('holiday');
+474:    if (isChildFollowUp && context?.lastIntent && (availableStudents ? availableStudents.some((s) => matchesStudent(s, lower)) : false)) {
+475:      return {
+476:        intent: context.lastIntent,
+477:        confidence: 0.94,
+478:        extractedSubject: context.lastSubject,
+479:        dateReference: context.lastDateReference,
+480:        rawQuery: query,
+481:      };
+482:    }
+484:    // 8. Homework Intents (Today / Tomorrow / Specific Date)
+485:    const hasHomeworkKeyword =
+486:      lower.includes('homework') ||
+487:      lower.includes('home work') ||
+488:      lower.includes('hw') ||
+489:      lower.includes('गृहपाठ') ||
+490:      lower.includes('गृह कार्य') ||
+491:      lower.includes('गृहकार्य') ||
+492:      lower.includes('assignment') ||
+493:      lower.includes('kya karna hai') ||
+494:      lower.includes('kya kaam hai') ||
+495:      lower.includes('task') ||
+496:      lower.includes('kal kya hai') ||
+497:      lower.includes('kal kya') ||
+498:      lower.includes('kal ka kya') ||
+499:      lower.includes('kal kya karna') ||
+500:      lower.includes('kal ka schedule') ||
+501:      lower.includes('कल क्या है') ||
+502:      lower.includes('उद्या काय आहे');
+504:    if (hasHomeworkKeyword) {
+505:      let hwIntent: AIIntent = 'HOMEWORK_TODAY';
+506:      let dateValue = 'today';
+508:      if (isTomorrow) {
+509:        hwIntent = 'HOMEWORK_TOMORROW';
+510:        dateValue = 'tomorrow';
+511:      } else if (dateRef?.type === 'date') {
+512:        hwIntent = 'HOMEWORK_DATE';
+513:        dateValue = dateRef.value;
+514:      }
+516:      return {
+517:        intent: hwIntent,
+518:        confidence: 0.95,
+519:        extractedSubject,
+520:        dateReference: dateValue,
+521:        rawQuery: query,
+522:      };
+523:    }
+525:    // 9. Exam Schedule Intent
+526:    const hasExamKeyword =
+527:      lower.includes('exam') ||
+528:      lower.includes('pariksha') ||
+529:      lower.includes('परीक्षा') ||
+530:      lower.includes('इम्तिहान') ||
+531:      lower.includes('ਪ੍ਰੀਖਿਆ') ||
+532:      lower.includes('পরীক্ষা') ||
+533:      lower.includes('கবে') ||
+534:      lower.includes('தேர்வு') ||
+535:      lower.includes('పరీక్ష') ||
+536:      lower.includes('પરીક્ષા') ||
+537:      lower.includes('test') ||
+538:      lower.includes('assessment') ||
+539:      lower.includes('date sheet') ||
+540:      lower.includes('datesheet') ||
+541:      lower.includes('paper kab');
+543:    if (hasExamKeyword || (isSequentialFollowUp && (context?.lastIntent === 'EXAM_SCHEDULE' || lower.includes('exam') || lower.includes('परीक्षा')))) {
+544:      return {
+545:        intent: 'EXAM_SCHEDULE',
+546:        confidence: 0.96,
+547:        extractedSubject,
+548:        rawQuery: query,
+549:        isSequentialFollowUp,
+550:      };
+551:    }
+553:    // 10. Holiday Information Intent
+554:    const hasHolidayKeyword =
+555:      lower.includes('holiday') ||
+556:      lower.includes('chhutti') ||
+557:      lower.includes('छुट्टी') ||
+558:      lower.includes('सुट्टी') ||
+559:      lower.includes('ਛੁੱਟੀ') ||
+560:      lower.includes('ছুটি') ||
+561:      lower.includes('விடுமுறை') ||
+562:      lower.includes('సెలవు') ||
+563:      lower.includes('રજા') ||
+564:      lower.includes('vacation') ||
+565:      lower.includes('off') ||
+566:      lower.includes('band hai') ||
+567:      lower.includes('school kab khulega');
+569:    if (hasHolidayKeyword) {
+570:      return {
+571:        intent: 'HOLIDAY_INFORMATION',
+572:        confidence: 0.95,
+573:        rawQuery: query,
+574:      };
+575:    }
+577:    // 11. Attendance Intent
+578:    const hasAttendanceKeyword =
+579:      lower.includes('attendance') ||
+580:      lower.includes('present') ||
+581:      lower.includes('absent') ||
+582:      lower.includes('upashthiti') ||
+583:      lower.includes('उपस्थिति') ||
+584:      lower.includes('हजेरी') ||
+585:      lower.includes('ਹਾਜ਼ਰੀ') ||
+586:      lower.includes('উপস্থিতি') ||
+587:      lower.includes('வருகை') ||
+588:      lower.includes('హాజరు') ||
+589:      lower.includes('હાજરી') ||
+590:      lower.includes('school gaya') ||
+591:      lower.includes('school gayi') ||
+592:      lower.includes('aaya hai') ||
+593:      lower.includes('gaya tha');
+595:    if (hasAttendanceKeyword) {
+596:      return {
+597:        intent: 'ATTENDANCE',
+598:        confidence: 0.94,
+599:        rawQuery: query,
+600:      };
+601:    }
+603:    // 12. Academic Progress / Results Intent
+604:    const hasProgressKeyword =
+605:      lower.includes('result') ||
+606:      lower.includes('progress') ||
+607:      lower.includes('marks') ||
+608:      lower.includes('grade') ||
+609:      lower.includes('report card') ||
+610:      lower.includes('pragati') ||
+611:      lower.includes('प्रगति') ||
+612:      lower.includes('परिणाम') ||
+613:      lower.includes('नंबर') ||
+614:      lower.includes('अंक') ||
+615:      lower.includes('गुणमान') ||
+616:      lower.includes('மதிப்பெண்') ||
+617:      lower.includes('మార్కులు') ||
+618:      lower.includes('માર્ક્સ') ||
+619:      lower.includes('kaisa padh raha');
+621:    if (hasProgressKeyword) {
+622:      return {
+623:        intent: 'ACADEMIC_PROGRESS',
+624:        confidence: 0.93,
+625:        rawQuery: query,
+626:      };
+627:    }
+629:    // 13. School Announcements / Notices Intent
+630:    const hasNoticeKeyword =
+631:      lower.includes('notice') ||
+632:      lower.includes('announcement') ||
+633:      lower.includes('suchna') ||
+634:      lower.includes('सूचना') ||
+635:      lower.includes('सर्कुलर') ||
+636:      lower.includes('circular') ||
+637:      lower.includes('ਨੋਟਿਸ') ||
+638:      lower.includes('বিজ্ঞপ্তি') ||
+639:      lower.includes('அறிவிப்பு') ||
+640:      lower.includes('నోటీసు') ||
+641:      lower.includes('સૂચના') ||
+642:      lower.includes('news');
+644:    if (hasNoticeKeyword) {
+645:      return {
+646:        intent: 'ANNOUNCEMENT',
+647:        confidence: 0.92,
+648:        rawQuery: query,
+649:      };
+650:    }
+652:    // 14. Timetable Intent
+653:    const hasTimetableKeyword =
+654:      lower.includes('timetable') ||
+655:      lower.includes('time table') ||
+656:      lower.includes('period') ||
+657:      lower.includes('schedule') ||
+658:      lower.includes('vegapathrak') ||
+659:      lower.includes('वेळापत्रक') ||
+660:      lower.includes('ਟਾਈਮ ਟੇਬਲ') ||
+661:      lower.includes('সময়সূচী') ||
+662:      lower.includes('வகுப்பு அட்டவணை') ||
+663:      lower.includes('సమయ పట్టిక') ||
+664:      lower.includes('સમયપત્રક');
+666:    if (hasTimetableKeyword) {
+667:      return {
+668:        intent: 'TIMETABLE',
+669:        confidence: 0.92,
+670:        rawQuery: query,
+671:      };
+672:    }
+674:    // 15. Student Information Intent
+675:    const hasChildInfoKeyword =
+676:      lower.includes('roll number') ||
+677:      lower.includes('roll no') ||
+678:      lower.includes('student id') ||
+679:      lower.includes('admission no') ||
+680:      lower.includes('class teacher') ||
+681:      lower.includes('teacher name') ||
+682:      lower.includes('section') ||
+683:      lower.includes('shikshak') ||
+684:      lower.includes('शिक्षक') ||
+685:      lower.includes('अध्यापक') ||
+686:      lower.includes('ke baare mein') ||
+687:      lower.includes('ke bare me') ||
+688:      lower.includes('ke baare me') ||
+689:      lower.includes('के बारे में') ||
+690:      lower.includes('बद्दल सांगा') ||
+691:      lower.includes('about') ||
+692:      lower.includes('details');
+694:    if (hasChildInfoKeyword) {
+695:      return {
+696:        intent: 'STUDENT_INFORMATION',
+697:        confidence: 0.91,
+698:        rawQuery: query,
+699:      };
+700:    }
+702:    // 16. General context fallback
+703:    if (extractedSubject && context?.lastIntent) {
+704:      return {
+705:        intent: context.lastIntent,
+706:        confidence: 0.85,
+707:        extractedSubject,
+708:        rawQuery: query,
+709:      };
+710:    }
+712:    return {
+713:      intent: 'UNKNOWN',
+714:      confidence: 0.1,
+715:      rawQuery: query,
+716:    };
+717:  }
+719:  /**
+720:   * Structured Natural Language Query Analyzer
+721:   * Determines:
+722:   * 1. Intent (from 13 supported intents)
+723:   * 2. Student (or all children / unclear)
+724:   * 3. Date ('today' | 'tomorrow' | specific date/day)
+725:   * 4. Subject if applicable (e.g. Mathematics, Science)
+726:   * 5. Language
+727:   */
+728:  public static async analyzeQuery(
+729:    rawQuery: string,
+730:    availableStudents: Student[],
+731:    preferredLanguage: LanguageCode = 'hi',
+732:    context?: ConversationContext,
+733:    activeStudent?: Student | null
+734:  ): Promise<StructuredQueryAnalysis> {
+735:    const query = (rawQuery || '').trim();
+737:    // 1. Language Determination
+738:    let detectedLang = preferredLanguage;
+739:    try {
+740:      const detection = await LanguageDetectionService.detect(query, preferredLanguage);
+741:      if (detection.confidence >= 0.5) {
+742:        detectedLang = detection.language;
+743:      }
+744:    } catch {
+745:      // Keep preferred
+746:    }
+748:    // 2. Intent Detection
+749:    const intentResult = this.detectIntent(query, context, availableStudents);
+751:    // 3. Student Resolution
+752:    const studentResult = this.resolveStudent(query, availableStudents, context, activeStudent);
+753:    const primaryStudent = studentResult.students.length > 0 ? studentResult.students[0] : null;
+755:    // 4. Date determination
+756:    const dateRef =
+757:      intentResult.dateReference ||
+758:      (intentResult.intent === 'HOMEWORK_TOMORROW'
+759:        ? 'tomorrow'
+760:        : intentResult.intent === 'HOMEWORK_TODAY'
+761:        ? 'today'
+762:        : undefined);
+764:    return {
+765:      intent: intentResult.intent,
+766:      student: primaryStudent,
+767:      students: studentResult.students,
+768:      isMultiChild: studentResult.mode === 'multi' || studentResult.mode === 'all',
+769:      date: dateRef,
+770:      subject: intentResult.extractedSubject,
+771:      language: detectedLang,
+772:      confidence: intentResult.confidence,
+773:      rawQuery: query,
+774:    };
+775:  }
+777:  /**
+778:   * 2. Student Identification & Multi-Child Resolution
+779:   */
+780:  public static resolveStudent(
+781:    query: string,
+782:    availableStudents: Student[],
+783:    context?: ConversationContext,
+784:    activeStudent?: Student | null
+785:  ): StudentResolutionResult {
+786:    const lower = (query || '').toLowerCase();
+788:    // Check Multi-Child Indicators across Indian languages
+789:    const hasMultiChildIndicator =
+790:      lower.includes('dono') ||
+791:      lower.includes('दोनों') ||
+792:      lower.includes('दोन्ही') ||
+793:      lower.includes('ਦੋਵੇਂ') ||
+794:      lower.includes('দুটো') ||
+795:      lower.includes('இருவரும்') ||
+796:      lower.includes('ఇద్దరు') ||
+797:      lower.includes('બંને') ||
+798:      lower.includes('all children') ||
+799:      lower.includes('my children') ||
+800:      lower.includes('sab bachch') ||
+801:      lower.includes('sabhi') ||
+802:      lower.includes('सभी बच्चों') ||
+803:      lower.includes('both kids') ||
+804:      lower.includes('kids');
+806:    // 1. Find all explicitly named students in the query (across Latin and Indic scripts)
+807:    const namedStudents = availableStudents.filter((s) => matchesStudent(s, lower));
+809:    if (namedStudents.length > 1) {
+810:      return {
+811:        mode: 'multi',
+812:        students: namedStudents,
+813:      };
+814:    }
+816:    if (namedStudents.length === 1) {
+817:      return {
+818:        mode: 'single',
+819:        students: [namedStudents[0]],
+820:      };
+821:    }
+823:    // 2. Check relationship / gender indicators and pronouns (e.g. "What's his homework?", "What's her homework?", "Meri beti", "Mera beta")
+824:    const hasFemaleRef =
+825:      /\b(her|hers|she|uski|unki|tichi)\b/i.test(lower) ||
+826:      DAUGHTER_KEYWORDS.some((k) => lower.includes(k));
+827:    const hasMaleRef =
+828:      /\b(his|him|he|uska|unka|tyacha)\b/i.test(lower) ||
+829:      SON_KEYWORDS.some((k) => lower.includes(k));
+831:    if (hasFemaleRef && !hasMaleRef) {
+832:      if (activeStudent && activeStudent.gender === 'female') {
+833:        return {
+834:          mode: 'single',
+835:          students: [activeStudent],
+836:        };
+837:      }
+838:      const daughters = availableStudents.filter((s) => s.gender === 'female');
+839:      if (daughters.length === 1) {
+840:        return {
+841:          mode: 'single',
+842:          students: [daughters[0]],
+843:        };
+844:      }
+845:      if (daughters.length > 1) {
+846:        return {
+847:          mode: 'multi',
+848:          students: daughters,
+849:        };
+850:      }
+851:      if (activeStudent) {
+852:        return {
+853:          mode: 'single',
+854:          students: [activeStudent],
+855:        };
+856:      }
+857:    }
+859:    if (hasMaleRef && !hasFemaleRef) {
+860:      if (activeStudent && activeStudent.gender === 'male') {
+861:        return {
+862:          mode: 'single',
+863:          students: [activeStudent],
+864:        };
+865:      }
+866:      const sons = availableStudents.filter((s) => s.gender === 'male');
+867:      if (sons.length === 1) {
+868:        return {
+869:          mode: 'single',
+870:          students: [sons[0]],
+871:        };
+872:      }
+873:      if (sons.length > 1) {
+874:        return {
+875:          mode: 'multi',
+876:          students: sons,
+877:        };
+878:      }
+879:      if (activeStudent) {
+880:        return {
+881:          mode: 'single',
+882:          students: [activeStudent],
+883:        };
+884:      }
+885:    }
+887:    if (hasMultiChildIndicator) {
+888:      return {
+889:        mode: 'all',
+890:        students: availableStudents,
+891:      };
+892:    }
+894:    // 3. Context Follow-up Memory:
+895:    // If the query is an elliptical follow-up ("What about Science?", "Aur Science?", "Kal ka?", "Friday ka?")
+896:    // without an explicit child name, maintain the student from context!
+897:    if (context?.lastStudentId) {
+898:      const rememberedStudent = availableStudents.find((s) => s.id === context.lastStudentId);
+899:      if (rememberedStudent) {
+900:        return {
+901:          mode: 'single',
+902:          students: [rememberedStudent],
+903:        };
+904:      }
+905:    }
+907:    // 4. Default: If only 1 child is registered in total
+908:    if (availableStudents.length === 1) {
+909:      return {
+910:        mode: 'single',
+911:        students: [availableStudents[0]],
+912:      };
+913:    }
+915:    // 5. If multiple children exist and an active student is selected
+916:    if (activeStudent) {
+917:      return {
+918:        mode: 'single',
+919:        students: [activeStudent],
+920:      };
+921:    }
+923:    // 6. Ambiguous Child Resolution Prompt (Exact match required: "Do you mean Rohan or Priya?")
+924:    if (availableStudents.length >= 2) {
+925:      const names = availableStudents.map((s) => (s.name || '').split(' ')[0]);
+926:      return {
+927:        mode: 'unclear',
+928:        students: [],
+929:        clarificationPrompt: {
+930:          en: `Do you mean ${names.slice(0, 2).join(' or ')}?`,
+931:          hi: `क्या आप ${names.slice(0, 2).join(' या ')} �    switch (intent) {
+932:      case 'HOMEWORK_TODAY':
+933:      case 'HOMEWORK_TOMORROW': {
+934:        const homework = await HomeworkService.getHomework(student.id);
+935:        const isForTomorrow = intent === 'HOMEWORK_TOMORROW';
+936:        const today = new Date();
+937:        const targetDate = isForTomorrow
+938:          ? new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+939:          : today;
+940:        const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+941:        const filtered = homework.filter((h) => {
+942:          if (isForTomorrow) {
+943:            return (
+944:              h.dueDate === dayName ||
+945:              (h.dueDate && new Date(h.dueDate).toDateString() === targetDate.toDateString())
+946:            );
+947:          }
+948:          return true;
+949:        });
+950:        if (extractedSubject) {
+951:          const subjectFiltered = filtered.filter((h) => matchesSubject(h.subject, extractedSubject));
+952:          return { data: subjectFiltered, isFound: subjectFiltered.length > 0 };
+953:        }
+954:        return { data: filtered, isFound: filtered.length > 0 };
+955:      }
+956:      case 'HOMEWORK_DATE': {
+957:        const homework = await HomeworkService.getHomework(student.id);
+958:        const dateRef = (dateReference || '').toLowerCase();
+959:        const filtered = homework.filter((h) => {
+960:          const dd = (h.dueDate || '').toLowerCase();
+961:          return dd.includes(dateRef) || dd === dateRef;
+962:        });
+963:        if (extractedSubject) {
+964:          const sub = filtered.filter((h) => matchesSubject(h.subject, extractedSubject));
+965:          return { data: sub, isFound: sub.length > 0 };
+966:        }
+967:        return { data: filtered, isFound: filtered.length > 0 };
+968:      }
+969:      case 'EXAM_SCHEDULE': {
+970:        const exams = await SchoolDataService.getExams(student.id);
+971:        if (extractedSubject) {
+972:          const subExams = exams.filter((e) => matchesSubject(e.subject, extractedSubject));
+973:          return { data: subExams, isFound: subExams.length > 0 };
+974:        }
+975:        return { data: exams, isFound: exams.length > 0 };
+976:      }
+977:      case 'ATTENDANCE': {
+978:        const att = await SchoolDataService.getAttendance(student.id);
+979:        return { data: att, isFound: !!att };
+980:      }
+981:      case 'ACADEMIC_PROGRESS': {
+982:        const progress = await SchoolDataService.getAcademicProgress(student.id);
+983:        return { data: progress, isFound: !!progress };
+984:      }
+985:      case 'TIMETABLE': {
+986:        const tt = await SchoolDataService.getTimetable(student.id);
+987:        return { data: tt, isFound: !!tt };
+988:      }
+989:      case 'STUDENT_INFORMATION':
+990:      case 'CHILD_INFORMATION': {
+991:        return { data: student, isFound: !!student };
+992:      }
+993:      case 'HOLIDAY_INFORMATION': {
+994:        const holidays = await SchoolDataService.getHolidays();
+995:        return { data: holidays, isFound: holidays.length > 0 };
+996:      }
+997:      case 'ANNOUNCEMENT':
+998:      case 'SCHOOL_ANNOUNCEMENT': {
+999:        const notices = await SchoolDataService.getAnnouncements();
+1000:        return { data: notices, isFound: notices.length > 0 };
+1001:      }
+1002:      case 'SWITCH_CHILD':
+1003:      case 'HELP':
+1004:        return { data: null, isFound: true };
+1005:      default:
+1006:        return { data: null, isFound: false };
+1007:    }
+1008:  }
+1010:  /**
+1011:   * 4. Generate Natural Language Response (Zero Fabrication)
+1012:   */
+1013:  private static generateResponse(
+1014:    query: string,
+1015:    intentResult: IntentDetectionResult,
+1016:    studentResult: StudentResolutionResult,
+1017:    schoolData: { data: any; isFound: boolean; error?: string },
+1018:    language: LanguageCode,
+1019:    context: ConversationContext,
+1020:    multiChildRecords: { child: Student; data: any }[] = []
+1021:  ): AIResponseResult {
+1022:    const intent = intentResult.intent;
+1024:    // A. Unclear speech / Unknown input handling
+1025:    if (intent === 'UNKNOWN' || intent === 'UNCLEAR_INPUT') {
+1026:      const unclearMsg: Record<LanguageCode, string> = {
+1027:        en: "Sorry, I didn't understand that. You can ask me about homework, exams, attendance, progress, or school holidays.",
+1028:        hi: 'माफ़ कीजिए, मैं समझ नहीं पाया। आप मुझसे होमवर्क, परीक्षा, उपस्थिति, प्रगति या छुट्टियों के बारे में पूछ सकते हैं।',
+1029:        mr: 'माफ करा, मला समजले नाही. आपण मला गृहपाठ, परीक्षा, हजेरी किंवा सुट्ट्यांबद्दल विचारू शकता.',
+1030:        pa: 'ਮਾਫ਼ ਕਰਨਾ, ਮੈਨੂੰ ਸਮਝ ਨਹੀਂ ਆਇਆ। ਤੁਸੀਂ ਮੈਨੂੰ ਹੋਮਵਰਕ, ਪ੍ਰੀਖਿਆਵਾਂ, ਹਾਜ਼ਰੀ ਜਾਂ ਛੁੱਟੀਆਂ ਬਾਰੇ ਪੁੱਛ ਸਕਦੇ ਹੋ।',
+1031:        bn: 'দুঃখিত, আমি বুঝতে পারিনি। আপনি আমাকে হোমওয়ার্ক, পরীক্ষা, উপস্থিতি বা ছুটির বিষয়ে জিজ্ঞাসা করতে পারেন।',
+1032:        ta: 'மன்னிக்கவும், எனக்குப் புரியவில்லை. வீட்டுப்பாடம், தேர்வுகள், வருகை அல்லது விடுமுறைகள் பற்றி என்னிடம் கேட்கலாம்.',
+1033:        te: 'క్షమించండి, నాకు అర్థం కాలేదు. మీరు నన్ను హోంవర్క్, పరీక్షలు, హాజరు లేదా సెలవుల గురించి అడగవచ్చు.',
+1034:        gu: 'માફ કરશો, મને સમજાયું નહીં. તમે મને લેસન, પરીક્ષા, હાજરી અથવા રજાઓ વિશે પૂછી શકો છો.',
+1035:      };
+1036:      return {
+1037:        query,
+1038:        intent,
+1039:        isMultiChild: false,
+1040:        spokenResponse: unclearMsg[language] || unclearMsg.en,
+1041:        displayResponse: unclearMsg[language] || unclearMsg.en,
+1042:        avatarMood: 'concerned',
+1043:        context,
+1044:      };
+1045:    }
+1047:    // B. Help intent handling
+1048:    if (intent === 'HELP') {
+1049:      const helpMsg: Record<LanguageCode, string> = {
+1050:        en: 'I can help you check homework, upcoming exams, today\'s attendance, report card marks, school holidays, timetables, and announcements. You can also ask me to switch children. Just ask naturally!',
+1051:        hi: 'मैं आपके बच्चों का होमवर्क, आने वाले एग्जाम, आज की उपस्थिति, रिजल्ट और अंक, स्कूल की छुट्टियां, टाइम-टेबल और सूचनाएं बता सकता हूँ। आप किसी भी बच्चे पर स्विच करने के लिए भी कह सकते हैं। बस स्वाभाविक रूप से बोलिए!',
+1052:        mr: 'मी तुम्हाला गृहपाठ, आगामी परीक्षा, आजची हजेरी, प्रगती पुस्तक, सुट्ट्या, वेळापत्रक आणि सूचना तपासण्यात मदत करू शकतो. तुम्ही मुलांना बदलण्यासाठीही सांगू शकता.',
+1053:        pa: 'ਮੈਂ ਹੋਮਵਰਕ, ਆਉਣ ਵਾਲੀਆਂ ਪ੍ਰੀਖਿਆਵਾਂ, ਹਾਜ਼ਰੀ, ਰਿਪੋਰਟ ਕਾਰਡ, ਛੁੱਟੀਆਂ, ਟਾਈਮ-ਟੇਬਲ ਅਤੇ ਨੋਟਿਸ ਦੱਸਣ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ।',
+1054:        bn: 'আমি আপনাকে হোমওয়ার্ক, আসন্ন পরীক্ষা, উপস্থিতি, ফলাফল, ছুটির দিন, সময়সূচী এবং ঘোষণা জানতে সাহায্য করতে পারি।',
+1055:        ta: 'வீட்டுப்பாடம், தேர்வுகள், வருகை, மதிப்பெண்கள், விடுமுறை நாட்கள் மற்றும் அறிவிப்புகளை அறிய நான் உதவ முடியும்.',
+1056:        te: 'నేను హోంవర్క్, పరీక్షలు, హాజరు, మార్కులు, సెలవులు, టైమ్‌టేబుల్ మరియు నోటీసులను తనిఖీ చేయడంలో మీకు సహాయపడగలను.',
+1057:        gu: 'હું તમને લેસన, આગામી પરીક્ષાઓ, હાજરી, માર્ક્સ, રજાઓ, સમયપત્રક અને સૂચનાઓ તપાસવામાં મદદ કરી શકું છું.',
+1058:      };
+1059:      return {
+1060:        query,
+1061:        intent,
+1062:        isMultiChild: false,
+1063:        spokenResponse: helpMsg[language] || helpMsg.en,
+1064:        displayResponse: helpMsg[language] || helpMsg.en,
+1065:        avatarMood: 'happy',
+1066:        context,
+1067:      };
+1068:    }
+1070:    // C. Unclear student disambiguation handling
+1071:    if (studentResult.mode === 'unclear') {
+1072:      const prompt =
+1073:        studentResult.clarificationPrompt?.[language] ||
+1074:        studentResult.clarificationPrompt?.en ||
+1075:        (language === 'hi'
+1076:          ? 'क्या आप रोहन या प्रिया के बारे में पूछ रहे हैं?'
+1077:          : 'Do you mean Rohan or Priya?');
+1078:      return {
+1079:        query,
+1080:        intent,
+1081:        isMultiChild: false,
+1082:        spokenResponse: prompt,
+1083:        displayResponse: prompt,
+1084:        avatarMood: 'thinking',
+1085:        context,
+1086:      };
+1087:    }
+1089:    // D. Multi-Child query handling
+1090:    if (studentResult.mode === 'multi' || studentResult.mode === 'all') {
+1091:      const kids = studentResult.students;
+1092:      return this.formatMultiChildResponse(query, intent, kids, language, context, multiChildRecords);
+1093:    }
+1095:    // E. Single Student query handling
+1096:    const student = studentResult.students[0];
+1097:    const studentName = student ? this.getLocalizedStudentName(student.name, language) : 'Student';
+1099:    // F. Switch Child intent handling
+1100:    if (intent === 'SWITCH_CHILD' && student) {
+1101:      const switchMsg: Record<LanguageCode, string> = {
+1102:        en: `Switched to ${studentName}. How can I help with ${studentName}'s school updates?`,
+1103:        hi: `${studentName} पर स्विच कर दिया गया है। ${studentName} के बारे में क्या जानना चाहते हैं?`,
+1104:        mr: `${studentName} वर स्विच केले आहे. ${studentName} बद्दल काय जाणून घ्यायचे आहे?`,
+1105:        pa: `${studentName} 'ਤੇ ਸਵਿਚ ਕੀਤਾ ਗਿਆ ਹੈ। ${studentName} ਬਾਰੇ ਕੀ ਜਾਣਨਾ ਚਾਹੁੰਦੇ ਹੋ?`,
+1106:        bn: `${studentName} এ পরিবর্তন করা হয়েছে। ${studentName} সম্পর্কে কী জানতে চান?`,
+1107:        ta: `${studentName} க்கு மாற்றப்பட்டது. ${studentName} பற்றி என்ன தெரிந்துகொள்ள விரும்புகிறீர்கள்?`,
+1108:        te: `${studentName} కి మార్చబడింది. ${studentName} గురించి ఏమి తెలుసుకోవాలనుకుంటున్నారు?`,
+1109:        gu: `${studentName} પર સ્વિચ કર્યું છે. ${studentName} વિશે શું જાણવું છે?`,
+1110:      };
+1111:      return {
+1112:        query,
+1113:        intent,
+1114:        studentId: student.id,
+1115:        studentName,
+1116:        isMultiChild: false,
+1117:        spokenResponse: switchMsg[language] || switchMsg.en,
+1118:        displayResponse: switchMsg[language] || switchMsg.en,
+1119:        avatarMood: 'happy',
+1120:        context,
+1121:        switchChildId: student.id,
+1122:      };
+1123:    }
+1125:    // 1. Data retrieval error check
+1126:    if (schoolData?.error) {
+1127:      const errorMsg =
+1128:        language === 'hi'
+1129:          ? 'मैं अभी स्कूल रिकॉर्ड्स एक्सेस नहीं कर सका। कृपया दोबारा प्रयास करें।'
+1130:          : "I couldn't access the school records right now. Please try again.";
+1131:      return {
+1132:        query,
+1133:        intent,
+1134:        studentId: student?.id,
+1135:        studentName,
+1136:        isMultiChild: false,
+1137:        spokenResponse: errorMsg,
+1138:        displayResponse: errorMsg,
+1139:        avatarMood: 'error',
+1140:        context,
+1141:      };
+1142:    }
+1144:    // 2. Data unavailable / Not found check (for non-homework or missing records)
+1145:    if (!schoolData.isFound && intent !== 'HOMEWORK_TODAY' && intent !== 'HOMEWORK_TOMORROW' && intent !== 'HOMEWORK_DATE') {
+1146:      const notFoundMsg: Record<LanguageCode, string> = {
+1147:        en: "I don't have that information from the school yet.",
+1148:        hi: 'मुझे आपके स्कूल से अभी यह जानकारी नहीं मिली है।',
+1149:        mr: 'मला शाळेकडून अद्याप ही माहिती मिळालेली नाही.',
+1150:        pa: 'ਮੈਨੂੰ ਸਕੂਲ ਤੋਂ ਅਜੇ ਇਹ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ।',
+1151:        bn: 'আমি স্কুল থেকে এখনও এই তথ্য পাইনি।',
+1152:        ta: 'பள்ளியிலிருந்து அந்த விவரம் இன்னும் கிடைக்கவில்லை.',
+1153:        te: 'పాఠశాల నుండి ఆ సమాచారం ఇంకా అందలేదు.',
+1154:        gu: 'મને શાળામાંથી હજી આ માહિતી મળી નથી.',
+1155:      };
+1156:      return {
+1157:        query,
+1158:        intent,
+1159:        studentId: student?.id,
+1160:        studentName,
+1161:        isMultiChild: false,
+1162:        spokenResponse: notFoundMsg[language] || notFoundMsg.en,
+1163:        displayResponse: notFoundMsg[language] || notFoundMsg.en,
+1164:        avatarMood: 'concerned',
+1165:        context,
+1166:      };
+1167:    }��विक रूप से बोलिए!',
+1168:        mr: 'मी तुम्हाला गृहपाठ, आगामी परीक्षा, आजची हजेरी, प्रगती पुस्तक, सुट्ट्या, वेळापत्रक आणि सूचना तपासण्यात मदत करू शकतो. तुम्ही मुलांना बदलण्यासाठीही सांगू शकता.',
+1169:        pa: 'ਮੈਂ ਹੋਮਵਰਕ, ਆਉਣ ਵਾਲੀਆਂ ਪ੍ਰੀਖਿਆਵਾਂ, ਹਾਜ਼ਰੀ, ਰਿਪੋਰਟ ਕਾਰਡ, ਛੁੱਟੀਆਂ, ਟਾਈਮ-ਟੇਬਲ ਅਤੇ ਨੋਟਿਸ ਦੱਸਣ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ।',
+1170:        bn: 'আমি আপনাকে হোমওয়ার্ক, আসন্ন পরীক্ষা, উপস্থিতি, ফলাফল, ছুটির দিন, সময়সূচী এবং ঘোষণা জানতে সাহায্য করতে পারি।',
+1171:        ta: 'வீட்டுப்பாடம், தேர்வுகள், வருகை, மதிப்பெண்கள், விடுமுறை நாட்கள் மற்றும் அறிவிப்புகளை அறிய நான் உதவ முடியும்.',
+1172:        te: 'నేను హోంవర్క్, పరీక్షలు, హాజరు, మార్కులు, సెలవులు, టైమ్‌టేబుల్ మరియు నోటీసులను తనిਖీ చేయడంలో మీకు సహాయపడగలను.',
+1173:        gu: 'હું તમને લેસન, આગામી પરીક્ષાઓ, હાજરી, માર્ક્સ, રજાઓ, સમયપત્રક અને સૂચનાઓ તપાસવામાં મદદ કરી શકું છું.',
+1174:      };
+1175:      return {
+1176:        query,
+1177:        intent,
+1178:        isMultiChild: false,
+1179:        spokenResponse: helpMsg[language] || helpMsg.en,
+1180:        displayResponse: helpMsg[language] || helpMsg.en,
+1181:        avatarMood: 'happy',
+1182:        context,
+1183:      };
+1184:    }
+1186:    // C. Unclear student disambiguation handling
+1187:    if (studentResult.mode === 'unclear') {
+1188:      const prompt =
+1189:        studentResult.clarificationPrompt?.[language] ||
+1190:        studentResult.clarificationPrompt?.en ||
+1191:        (language === 'hi'
+1192:          ? 'क्या आप रोहन या प्रिया के बारे में पूछ रहे हैं?'
+1193:          : 'Do you mean Rohan or Priya?');
+1194:      return {
+1195:        query,
+1196:        intent,
+1197:        isMultiChild: false,
+1198:        spokenResponse: prompt,
+1199:        displayResponse: prompt,
+1200:        avatarMood: 'thinking',
+1201:        context,
+1202:      };
+1203:    }
+1205:    // D. Multi-Child query handling
+1206:    if (studentResult.mode === 'multi' || studentResult.mode === 'all') {
+1207:      const kids = studentResult.students;
+1208:      return this.formatMultiChildResponse(query, intent, kids, language, context, multiChildRecords);
+1209:    }
+1211:    // E. Single Student query handling
+1212:    const student = studentResult.students[0];
+1213:    const studentName = student ? this.getLocalizedStudentName(student.name, language) : 'Student';
+1215:    // F. Switch Child intent handling
+1216:    if (intent === 'SWITCH_CHILD' && student) {
+1217:      const switchMsg: Record<LanguageCode, string> = {
+1218:        en: `Switched to ${studentName}. How can I help with ${studentName}'s school updates?`,
+1219:        hi: `${studentName} पर स्विच कर दिया गया है। ${studentName} के बारे में क्या जानना चाहते हैं?`,
+1220:        mr: `${studentName} वर स्विच केले आहे. ${studentName} बद्दल काय जाणून घ्यायचे आहे?`,
+1221:        pa: `${studentName} 'ਤੇ ਸਵਿਚ ਕੀਤਾ ਗਿਆ ਹੈ। ${studentName} ਬਾਰੇ ਕੀ ਜਾਣਨਾ ਚਾਹੁੰਦੇ ਹੋ?`,
+1222:        bn: `${studentName} এ পরিবর্তন করা হয়েছে। ${studentName} সম্পর্কে কী জানতে চান?`,
+1223:        ta: `${studentName} க்கு மாற்றப்பட்டது. ${studentName} பற்றி என்ன தெரிந்துகொள்ள விரும்புகிறீர்கள்?`,
+1224:        te: `${studentName} కి మార్చబడింది. ${studentName} గురించి ఏమి తెలుసుకోవాలనుకుంటున్నారు?`,
+1225:        gu: `${studentName} પર સ્વિચ કર્યું છે. ${studentName} વિશે શું જાણવું છે?`,
+1226:      };
+1227:      return {
+1228:        query,
+1229:        intent,
+1230:        studentId: student.id,
+1231:        studentName,
+1232:        isMultiChild: false,
+1233:        spokenResponse: switchMsg[language] || switchMsg.en,
+1234:        displayResponse: switchMsg[language] || switchMsg.en,
+1235:        avatarMood: 'happy',
+1236:        context,
+1237:        switchChildId: student.id,
+1238:      };
+1239:    }
+1241:    // 1. Data retrieval error check
+1242:    if (schoolData?.error) {
+1243:      const errorMsg =
+1244:        language === 'hi'
+1245:          ? 'मैं अभी स्कूल रिकॉर्ड्स एक्सेस नहीं कर सका। कृपया दोबारा प्रयास करें।'
+1246:          : "I couldn't access the school records right now. Please try again.";
+1247:      return {
+1248:        query,
+1249:        intent,
+1250:        studentId: student?.id,
+1251:        studentName,
+1252:        isMultiChild: false,
+1253:        spokenResponse: errorMsg,
+1254:        displayResponse: errorMsg,
+1255:        avatarMood: 'error',
+1256:        context,
+1257:      };
+1258:    }
+1260:    // 2. Data unavailable / Not found check (for non-homework or missing records)
+1261:    if (!schoolData.isFound && intent !== 'HOMEWORK_TODAY' && intent !== 'HOMEWORK_TOMORROW' && intent !== 'HOMEWORK_DATE') {
+1262:      const notFoundMsg: Record<LanguageCode, string> = {
+1263:        en: "I don't have that information from the school yet.",
+1264:        hi: 'मुझे आपके स्कूल से अभी यह जानकारी नहीं मिली है।',
+1265:        mr: 'मला शाळेकडून अद्याप ही माहिती मिळालेली नाही.',
+1266:        pa: 'ਮੈਨੂੰ ਸਕੂਲ ਤੋਂ ਅਜੇ ਇਹ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ।',
+1267:        bn: 'আমি স্কুল থেকে এখনও এই তথ্য পাইনি।',
+1268:        ta: 'பள்ளியிலிருந்து அந்த விவரம் இன்னும் கிடைக்கவில்லை.',
+1269:        te: 'పాఠశాల నుండి ఆ సమాచారం ఇంకా అందలేదు.',
+1270:        gu: 'મને શાળામાંથી હજી આ માહિતી મળી નથી.',
+1271:      };
+1272:      return {
+1273:        query,
+1274:        intent,
+1275:        studentId: student?.id,
+1276:        studentName,
+1277:        isMultiChild: false,
+1278:        spokenResponse: notFoundMsg[language] || notFoundMsg.en,
+1279:        displayResponse: notFoundMsg[language] || notFoundMsg.en,
+1280:        avatarMood: 'concerned',
+1281:        context,
+1282:      };
+1283:    }
+1285:    // Format single-student responses based on verified data across 8 languages
+1286:    switch (intent) {
+1287:      case 'HOMEWORK_TODAY':
+1288:      case 'HOMEWORK_TOMORROW': {
+1289:        const homeworkList = ((schoolData.data as any[]) || []).filter((h) => !h.isCompleted);
+1290:        if (homeworkList.length === 0) {
+1291:          const emptyHwMap: Record<LanguageCode, string> = {
+1292:            en: `There is no homework recorded for ${studentName}.`,
+1293:            hi: `${studentName} के लिए कोई होमवर्क रिकॉर्ड नहीं है।`,
+1294:            mr: `${studentName} साठी कोणताही गृहपाठ नोंदवलेला नाही.`,
+1295:            pa: `${studentName} ਲਈ ਕੋਈ ਹੋਮਵਰਕ ਦਰਜ ਨਹੀਂ ਹੈ।`,
+1296:            bn: `${studentName} এর জন্য কোনো হোমওয়ার্ক রেকর্ড নেই।`,
+1297:            ta: `${studentName} க்கான வீட்டுப்பாடம் பதிவு செய்யப்படவில்லை.`,
+1298:            te: `${studentName} కి ఎలాంటి హోంవర్క్ నమోదు చేయబడలేదు.`,
+1299:            gu: `${studentName} માટે કોઈ લેસન નોંધાયેલ નથી.`,
+1300:          };
+1301:          const msg = emptyHwMap[language] || `There is no homework recorded for ${studentName}.`;
+1302:          return {
+1303:            query,
+1304:            intent,
+1305:            studentId: student.id,
+1306:            studentName,
+1307:            isMultiChild: false,
+1308:            spokenResponse: msg,
+1309:            displayResponse: msg,
+1310:            avatarMood: 'concerned',
+1311:            detailedData: schoolData.data,
+1312:            context,
+1313:          };
+1314:        }
+1316:        const topHw = homeworkList[0];
+1317:        let spoken = '';
+1318:        if (homeworkList.length === 1) {
+1319:          const desc = topHw.description || topHw.title;
+1320:          const spokenMap: Record<LanguageCode, string> = {
+1321:            en: intent === 'HOMEWORK_TOMORROW'
+1322:              ? `Tomorrow ${studentName} has ${topHw.subject} homework: ${desc}.`
+1323:              : `Today ${studentName} has ${topHw.subject} homework: ${desc}.`,
+1324:            hi: intent === 'HOMEWORK_TOMORROW'
+1325:              ? `Kal ${studentName} ka ${topHw.subject} homework hai: ${desc}।`
+1326:              : `Aaj ${studentName} ka ${topHw.subject} homework hai: ${desc}।`,
+1327:            mr: `${studentName} ला ${topHw.subject} चा गृहपाठ आहे: ${desc}.`,
+1328:            pa: `${studentName} ਨੂੰ ${topHw.subject} ਦਾ ਕੰਮ ਮਿਲਿਆ ਹੈ: ${desc}।`,
+1329:            bn: `${studentName} এর ${topHw.subject} এ কাজ আছে: ${desc}।`,
+1330:            ta: `${studentName} க்கு ${topHw.subject} வீட்டுப்பாடம் உள்ளது: ${desc}.`,
+1331:            te: `${studentName} కి ${topHw.subject} లో హోంవర్క్ ఉంది: ${desc}.`,
+1332:            gu: `${studentName} ને ${topHw.subject} નું લેસન છે: ${desc}.`,
+1333:          };
+1334:          spoken = spokenMap[language] || spokenMap.en;
+1335:        } else {
+1336:          const itemsSummaryEn = homeworkList.map((h) => `${h.subject}: ${h.description || h.title}`).join(', and ');
+1337:          const itemsSummaryHi = homeworkList.map((h) => `${h.subject} (${h.description || h.title})`).join(', और ');
+1338:          const spokenMap: Record<LanguageCode, string> = {
+1339:            en: intent === 'HOMEWORK_TOMORROW'
+1340:              ? `Tomorrow ${studentName} has homework in ${itemsSummaryEn}.`
+1341:              : `Today ${studentName} has homework in ${itemsSummaryEn}.`,
+1342:            hi: intent === 'HOMEWORK_TOMORROW'
+1343:              ? `Kal ${studentName} ka homework hai: ${itemsSummaryHi}।`
+1344:              : `Aaj ${studentName} ka homework hai: ${itemsSummaryHi}।`,
+1345:            mr: `${studentName} चा गृहपाठ: ${itemsSummaryEn}.`,
+1346:            pa: `${studentName} ਦਾ ਹੋਮਵਰਕ: ${itemsSummaryEn}।`,
+1347:            bn: `${studentName} এর হোমওয়ার্ক: ${itemsSummaryEn}।`,
+1348:            ta: `${studentName} இன் வீட்டுப்பாடம்: ${itemsSummaryEn}.`,
+1349:            te: `${studentName} హోంవర్క్: ${itemsSummaryEn}.`,
+1350:            gu: `${studentName} નું લેસન: ${itemsSummaryEn}.`,
+1351:          };
+1352:          spoken = spokenMap[language] || spokenMap.en;
+1353:        }
+1355:        return {
+1356:          query,
+1357:          intent,
+1358:          studentId: student.id,
+1359:          studentName,
+1360:          isMultiChild: false,
+1361:          spokenResponse: spoken,
+1362:          displayResponse: spoken,
+1363:          avatarMood: 'happy',
+1364:          detailedData: schoolData.data,
+1365:          context,
+1366:        };
+1367:      }
+1369:      case 'HOMEWORK_DATE': {
+1370:        const homeworkList = ((schoolData.data as any[]) || []).filter((h) => !h.isCompleted);
+1371:        if (homeworkList.length === 0) {
+1372:          const notFoundMsg: Record<LanguageCode, string> = {
+1373:            en: "I don't have that information from the school yet.",
+1374:            hi: 'मुझे आपके स्कूल से अभी यह जानकारी नहीं मिली है।',
+1375:            mr: 'मला शाळेकडून अद्याप ही माहिती मिळालेली नाही.',
+1376:            pa: 'ਮੈਨੂੰ ਸਕੂਲ ਤੋਂ ਅਜੇ ਇਹ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ।',
+1377:            bn: 'আমি স্কুল থেকে এখনও এই তথ্য পাইনি।',
+1378:            ta: 'பள்ளியிலிருந்து அந்த விவரம் இன்னும் கிடைக்கவில்லை.',
+1379:            te: 'పాఠశాల నుండి ఆ సమాచారం ఇంకా అందలేదు.',
+1380:            gu: 'મને શાળામાંથી હજી આ માહિતી મળી નથી.',
+1381:          };
+1382:          const msg = notFoundMsg[language] || notFoundMsg.en;
+1383:          return {
+1384:            query,
+1385:            intent,
+1386:            studentId: student.id,
+1387:            studentName,
+1388:            isMultiChild: false,
+1389:            spokenResponse: msg,
+1390:            displayResponse: msg,
+1391:            avatarMood: 'concerned',
+1392:            detailedData: [],
+1393:            context,
+1394:          };
+1395:        }
+1397:        const topHw = homeworkList[0];
+1398:        const desc = topHw.description || topHw.title;
+1399:        const dateLabel = intentResult.dateReference || 'that day';
+1400:        const spokenMap: Record<LanguageCode, string> = {
+1401:          en: `On ${dateLabel}, ${studentName} has ${topHw.subject} homework: ${desc}.`,
+1402:          hi: `${dateLabel} ko ${studentName} ka ${topHw.subject} homework hai: ${desc}।`,
+1403:          mr: `${dateLabel} रोजी ${studentName} चा ${topHw.subject} चा गृहपाठ आहे: ${desc}.`,
+1404:          pa: `${dateLabel} ਨੂੰ ${studentName} ਦਾ ${topHw.subject} ਦਾ ਕੰਮ ਹੈ: ${desc}।`,
+1405:          bn: `${dateLabel} তারিখে ${studentName} এর ${topHw.subject} এ কাজ আছে: ${desc}।`,
+1406:          ta: `${dateLabel} அன்று ${studentName} க்கு ${topHw.subject} வீட்டுப்பாடம் உள்ளது: ${desc}.`,
+1407:          te: `${dateLabel} న ${studentName} కి ${topHw.subject} హోంవర్క్ ఉంది: ${desc}.`,
+1408:          gu: `${dateLabel} ના રોજ ${studentName} ને ${topHw.subject} નું લેસન છે: ${desc}.`,
+1409:        };
+1410:        const spoken = spokenMap[language] || spokenMap.en;
+1411:        return {
+1412:          query,
+1413:          intent,
+1414:          studentId: student.id,
+1415:          studentName,
+1416:          isMultiChild: false,
+1417:          spokenResponse: spoken,
+1418:          displayResponse: spoken,
+1419:          avatarMood: 'happy',
+1420:          detailedData: schoolData.data,
+1421:          context,
+1422:        };
+1423:      }
+1425:      case 'EXAM_SCHEDULE': {
+1426:        const exams = (schoolData.data as any[]) || [];
+1427:        if (!exams || exams.length === 0) {
+1428:          const emptyExamMap: Record<LanguageCode, string> = {
+1429:            en: "I don't have that information from the school yet.",
+1430:            hi: 'मुझे आपके स्कूल से अभी यह जानकारी नहीं मिली है।',
+1431:            mr: 'मला शाळेकडून अद्याप ही माहिती मिळालेली नाही.',
+1432:            pa: 'ਮੈਨੂੰ ਸਕੂਲ ਤੋਂ ਅਜੇ ਇਹ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ।',
+1433:            bn: 'আমি স্কুল থেকে এখনও এই তথ্য পাইনি।',
+1434:            ta: 'பள்ளியிலிருந்து அந்த விவரம் இன்னும் கிடைக்கவில்லை.',
+1435:            te: 'పాఠశాల నుండి ఆ సమాచారం ఇంకా అందలేదు.',
+1436:            gu: 'મને શાળામાંથી હજી આ માહિતી મળી નથી.',
+1437:          };
+1438:          const msg = emptyExamMap[language] || emptyExamMap.en;
+1439:          return {
+1440:            query,
+1441:            intent,
+1442:            studentId: student.id,
+1443:            studentName,
+1444:            isMultiChild: false,
+1445:            spokenResponse: msg,
+1446:            displayResponse: msg,
+1447:            avatarMood: 'concerned',
+1448:            detailedData: [],
+1449:            context,
+1450:          };
+1451:        }
+1453:        // Sequential Context Follow-up: "Uske baad wala exam?" / "next after that"
+1454:        if (intentResult.isSequentialFollowUp && exams.length > 1) {
+1455:          const subsequentExam = exams[1];
+1456:          const previousSubject = exams[0].subject;
+1458:          const spokenMap: Record<LanguageCode, string> = {
+1459:            en: `After ${previousSubject}, ${studentName}'s next exam is ${subsequentExam.subject} on ${subsequentExam.date} (${subsequentExam.time}). ${subsequentExam.title}. Syllabus: ${subsequentExam.syllabus}.`,
+1460:            hi: `${previousSubject} के बाद ${studentName} का अगला एग्जाम ${subsequentExam.subject} का है, ${subsequentExam.date} को (${subsequentExam.time})। ${subsequentExam.title}। सिलेबस: ${subsequentExam.syllabus}।`,
+1461:            mr: `${previousSubject} नंतर ${studentName} ची पुढची परीक्षा ${subsequentExam.date} रोजी ${subsequentExam.subject} ची आहे (${subsequentExam.time}). ${subsequentExam.title}. अभ्यासक्रम: ${subsequentExam.syllabus}.`,
+1462:            pa: `${previousSubject} ਤੋਂ ਬਾਅਦ ${studentName} ਦੀ ਅਗਲੀ ਪ੍ਰੀਖਿਆ ${subsequentExam.date} ਨੂੰ ${subsequentExam.subject} ਦੀ ਹੈ (${subsequentExam.time})। ${subsequentExam.title}। ਸਿਲੇਬਸ: ${subsequentExam.syllabus}।`,
+1463:            bn: `${previousSubject} এর পরে ${studentName} এর পরবর্তী পরীক্ষা ${subsequentExam.date} তারিখে ${subsequentExam.subject} এর (${subsequentExam.time})। ${subsequentExam.title}। সিলেবাস: ${subsequentExam.syllabus}।`,
+1464:            ta: `${previousSubject} க்குப் பிறகு ${studentName} இன் அடுத்த தேர்வு ${subsequentExam.date} அன்று ${subsequentExam.subject} ஆகும் (${subsequentExam.time}). ${subsequentExam.title}.`,
+1465:            te: `${previousSubject} తర్వాత ${studentName} తదుపరి పరీక్ష ${subsequentExam.date} న ${subsequentExam.subject} (${subsequentExam.time}). ${subsequentExam.title}.`,
+1466:            gu: `${previousSubject} પછી ${studentName} ની આગામી પરીક્ષા ${subsequentExam.date} ના રોજ ${subsequentExam.subject} ની છે (${subsequentExam.time}). ${subsequentExam.title}.`,
+1467:          };
+1469:          const spoken = spokenMap[language] || spokenMap.en;
+1470:          return {
+1471:            query,
+1472:            intent,
+1473:            studentId: student.id,
+1474:            studentName,
+1475:            isMultiChild: false,
+1476:            spokenResponse: spoken,
+1477:            displayResponse: spoken,
+1478:            avatarMood: 'happy',
+1479:            detailedData: subsequentExam,
+1480:            context,
+1481:          };
+1482:        }
+1484:        const firstExam = exams[0];
+1485:        const cleanDate = firstExam.date.replace(/^[A-Za-z]+,\s*/, '').replace(/\s+\d{4}$/, '') || firstExam.date;
+1487:        const spokenMap: Record<LanguageCode, string> = {
+1488:          en: `${studentName}'s ${firstExam.subject} exam is on ${firstExam.date} (${firstExam.time}). ${firstExam.title}. Syllabus: ${firstExam.syllabus}.`,
+1489:          hi: `${studentName} ka ${firstExam.subject} exam ${cleanDate} ko hai।`,
+1490:          mr: `${studentName} ची ${firstExam.subject} ची परीक्षा ${cleanDate} रोजी आहे.`,
+1491:          pa: `${studentName} ਦੀ ${firstExam.subject} ਦੀ ਪ੍ਰੀਖਿਆ ${cleanDate} ਨੂੰ ਹੈ।`,
+1492:          bn: `${studentName} এর ${firstExam.subject} পরীক্ষা ${cleanDate} তারিখে।`,
+1493:          ta: `${studentName} இன் ${firstExam.subject} தேர்வு ${cleanDate} அன்று உள்ளது.`,
+1494:          te: `${studentName} ${firstExam.subject} పరీక్ష ${cleanDate} న ఉంది.`,
+1495:          gu: `${studentName} ની ${firstExam.subject} પરીક્ષા ${cleanDate} ના રોજ છે.`,
+1496:        };
+1498:        const spoken = spokenMap[language] || spokenMap.en;
+1499:        return {
+1500:          query,
+1501:          intent,
+1502:          studentId: student.id,
+1503:          studentName,
+1504:          isMultiChild: false,
+1505:          spokenResponse: spoken,
+1506:          displayResponse: spoken,
+1507:          avatarMood: 'happy',
+1508:          detailedData: firstExam,
+1509:          context,
+1510:        };
+1511:      }pokenMap.en;
+1512:        }
+1514:        return {
+1515:          query,
+1516:          intent,
+1517:          studentId: student.id,
+1518:          studentName,
+1519:          isMultiChild: false,
+1520:          spokenResponse: spoken,
+1521:          displayResponse: spoken,
+1522:          avatarMood: 'happy',
+1523:          detailedData: schoolData.data,
+1524:          context,
+1525:        };
+1526:      }
+1528:      case 'EXAM_SCHEDULE': {
+1529:        const exams = (schoolData.data as any[]) || [];
+1530:        if (!exams || exams.length === 0) {
+1531:          const emptyExamMap: Record<LanguageCode, string> = {
+1532:            en: 'The school has not updated the exam schedule yet.',
+1533:            hi: 'Abhi school ne exam schedule update nahi kiya hai.',
+1534:            mr: 'शाळेने अद्याप परीक्षेचे वेळापत्रक अपडेट केलेले नाही.',
+1535:            pa: 'ਸਕੂਲ ਨੇ ਅਜੇ ਪ੍ਰੀਖਿਆ ਸ਼ਡਿਊਲ ਅਪਡੇਟ ਨਹੀਂ ਕੀਤਾ ਹੈ।',
+1536:            bn: 'স্কুল এখনও পরীক্ষার সময়সূচী আপডেট করেনি।',
+1537:            ta: 'பள்ளி இன்னும் தேர்வு அட்டவணையை வெளியிடவில்லை.',
+1538:            te: 'పాఠశాల ఇంకా పరీక్షల షెడ్యూల్ అప్‌డేట్ చేయలేదు.',
+1539:            gu: 'શાળાએ હજુ પરીક્ષાનું ટાઇમટેબલ અપડેટ કર્યું નથી.',
+1540:          };
+1541:          const msg = emptyExamMap[language] || emptyExamMap.en;
+1542:          return {
+1543:            query,
+1544:            intent,
+1545:            studentId: student.id,
+1546:            studentName,
+1547:            isMultiChild: false,
+1548:            spokenResponse: msg,
+1549:            displayResponse: msg,
+1550:            avatarMood: 'concerned',
+1551:            detailedData: [],
+1552:            context,
+1553:          };
+1554:        }
+1556:        // Sequential Context Follow-up: "Uske baad wala exam?" / "next after that"
+1557:        if (intentResult.isSequentialFollowUp && exams.length > 1) {
+1558:          const subsequentExam = exams[1];
+1559:          const previousSubject = exams[0].subject;
+1561:          const spokenMap: Record<LanguageCode, string> = {
+1562:            en: `After ${previousSubject}, ${studentName}'s next exam is ${subsequentExam.subject} on ${subsequentExam.date} (${subsequentExam.time}). ${subsequentExam.title}. Syllabus: ${subsequentExam.syllabus}.`,
+1563:            hi: `${previousSubject} के बाद ${studentName} का अगला एग्जाम ${subsequentExam.subject} का है, ${subsequentExam.date} को (${subsequentExam.time})। ${subsequentExam.title}। सिलेबस: ${subsequentExam.syllabus}।`,
+1564:            mr: `${previousSubject} नंतर ${studentName} ची पुढची परीक्षा ${subsequentExam.date} रोजी ${subsequentExam.subject} ची आहे (${subsequentExam.time}). ${subsequentExam.title}. अभ्यासक्रम: ${subsequentExam.syllabus}.`,
+1565:            pa: `${previousSubject} ਤੋਂ ਬਾਅਦ ${studentName} ਦੀ ਅਗਲੀ ਪ੍ਰੀਖਿਆ ${subsequentExam.date} ਨੂੰ ${subsequentExam.subject} ਦੀ ਹੈ (${subsequentExam.time})। ${subsequentExam.title}। ਸਿਲੇਬਸ: ${subsequentExam.syllabus}।`,
+1566:            bn: `${previousSubject} এর পরে ${studentName} এর পরবর্তী পরীক্ষা ${subsequentExam.date} তারিখে ${subsequentExam.subject} এর (${subsequentExam.time})। ${subsequentExam.title}। সিলেবাস: ${subsequentExam.syllabus}।`,
+1567:            ta: `${previousSubject} க்குப் பிறகு ${studentName} இன் அடுத்த தேர்வு ${subsequentExam.date} அன்று ${subsequentExam.subject} ஆகும் (${subsequentExam.time}). ${subsequentExam.title}.`,
+1568:            te: `${previousSubject} తర్వాత ${studentName} తదుపరి పరీక్ష ${subsequentExam.date} న ${subsequentExam.subject} (${subsequentExam.time}). ${subsequentExam.title}.`,
+1569:            gu: `${previousSubject} પછી ${studentName} ની આગામી પરીક્ષા ${subsequentExam.date} ના રોજ ${subsequentExam.subject} ની છે (${subsequentExam.time}). ${subsequentExam.title}.`,
+1570:          };
+1572:          const spoken = spokenMap[language] || spokenMap.en;
+1573:          return {
+1574:            query,
+1575:            intent,
+1576:            studentId: student.id,
+1577:            studentName,
+1578:            isMultiChild: false,
+1579:            spokenResponse: spoken,
+1580:            displayResponse: spoken,
+1581:            avatarMood: 'happy',
+1582:            detailedData: subsequentExam,
+1583:            context,
+1584:          };
+1585:        }
+1587:        const firstExam = exams[0];
+1588:        const spokenMap: Record<LanguageCode, string> = {
+1589:          en: `${studentName}'s next exam is ${firstExam.subject} on ${firstExam.date} (${firstExam.time}). ${firstExam.title}. Syllabus: ${firstExam.syllabus}.`,
+1590:          hi: `${studentName} का अगला एग्जाम ${firstExam.subject} का है, ${firstExam.date} को (${firstExam.time})। ${firstExam.title}। सिलेबस: ${firstExam.syllabus}।`,
+1591:          mr: `${studentName} ची पुढची परीक्षा ${firstExam.date} रोजी ${firstExam.subject} ची आहे (${firstExam.time}). ${firstExam.title}. अभ्यासक्रम: ${firstExam.syllabus}.`,
+1592:          pa: `${studentName} ਦੀ ਅਗਲੀ ਪ੍ਰੀਖਿਆ ${firstExam.date} ਨੂੰ ${firstExam.subject} ਦੀ ਹੈ (${firstExam.time})। ${firstExam.title}। ਸਿਲੇਬਸ: ${firstExam.syllabus}।`,
+1593:          bn: `${studentName} এর পরবর্তী পরীক্ষা ${firstExam.date} তারিখে ${firstExam.subject} এর (${firstExam.time})। ${firstExam.title}। সিলেবাস: ${firstExam.syllabus}।`,
+1594:          ta: `${studentName} இன் அடுத்த தேர்வு ${firstExam.date} அன்று ${firstExam.subject} ஆகும் (${firstExam.time}). ${firstExam.title}.`,
+1595:          te: `${studentName} తదుపరి పరీక్ష ${firstExam.date} న ${firstExam.subject} (${firstExam.time}). ${firstExam.title}.`,
+1596:          gu: `${studentName} ની આગામી પરીક્ષા ${firstExam.date} ના રોજ ${firstExam.subject} ની છે (${firstExam.time}). ${firstExam.title}.`,
+1597:        };
+1599:        const spoken = spokenMap[language] || spokenMap.en;
+1600:        return {
+1601:          query,
+1602:          intent,
+1603:          studentId: student.id,
+1604:          studentName,
+1605:          isMultiChild: false,
+1606:          spokenResponse: spoken,
+1607:          displayResponse: spoken,
+1608:          avatarMood: 'happy',
+1609:          detailedData: firstExam,
+1610:          context,
+1611:        };
+1612:      }
+1614:      case 'ATTENDANCE': {
+1615:        const attData = schoolData.data || {};
+1616:        const att = attData.attendance;
+1617:        const isPres = attData.presentToday ?? student.presentToday ?? true;
+1618:        const pct = att?.overallPercentage ?? student.attendancePercentage ?? 94;
+1620:        const spokenMap: Record<LanguageCode, string> = {
+1621:          en: `${studentName} is ${isPres ? 'present' : 'absent'} today. Overall attendance is ${pct}%.`,
+1622:          hi: `${studentName} आज ${isPres ? 'उपस्थित' : 'अनुपस्थित'} है। कुल उपस्थिति ${pct}% है।`,
+1623:          mr: `${studentName} आज ${isPres ? 'हजर' : 'गैरहजर'} आहे. एकूण हजेरी ${pct}% आहे.`,
+1624:          pa: `${studentName} ਅੱਜ ${isPres ? 'ਹਾਜ਼ਰ' : 'ਗ਼ੈਰ-ਹਾਜ਼ਰ'} ਹੈ। ਕੁੱਲ ਹਾਜ਼ਰੀ ${pct}% ਹੈ।`,
+1625:          bn: `${studentName} আজ ${isPres ? 'উপস্থিত' : 'অনুপস্থিত'}। মোট উপস্থিতি ${pct}%।`,
+1626:          ta: `${studentName} இன்று ${isPres ? 'வந்துள்ளார்' : 'வரவில்லை'}. மொத்த வருகை ${pct}%.`,
+1627:          te: `${studentName} నేడు ${isPres ? 'హాజరయ్యారు' : 'హాజరుకాలేదు'}. మొత్తం హాజరు ${pct}%.`,
+1628:          gu: `${studentName} આજે ${isPres ? 'હાજર' : 'ગેરહાજર'} છે. કુલ હાજરી ${pct}% છે.`,
+1629:        };
+1631:        const spoken = spokenMap[language] || spokenMap.en;
+1632:        return {
+1633:          query,
+1634:          intent,
+1635:          studentId: student.id,
+1636:          studentName,
+1637:          isMultiChild: false,
+1638:          spokenResponse: spoken,
+1639:          displayResponse: spoken,
+1640:          avatarMood: pct >= 75 ? 'happy' : 'concerned',
+1641:          detailedData: attData,
+1642:          context,
+1643:        };
+1644:      }
+1646:      case 'ACADEMIC_PROGRESS': {
+1647:        const prog = schoolData.data as AcademicResult;
+1648:        const overall = prog?.overallPercentage ? `${prog.overallPercentage}%` : '88%';
+1649:        const grade = prog?.overallGrade || 'A';
+1650:        const remark = prog?.teacherRemark || '';
+1652:        const spokenMap: Record<LanguageCode, string> = {
+1653:          en: `${studentName}'s academic progress is Grade ${grade} with ${overall}. Teacher's remark: "${remark}".`,
+1654:          hi: `${studentName} की शैक्षणिक प्रगति ग्रेड ${grade} और ${overall} है। शिक्षक की टिप्पणी: "${remark}"।`,
+1655:          mr: `${studentName} ची शैक्षणिक प्रगती ग्रेड ${grade} सह ${overall} आहे. शिक्षकांचा शेरा: "${remark}".`,
+1656:          pa: `${studentName} ਦੀ ਵਿੱਦਿਅਕ ਪ੍ਰਗਤੀ ਗ੍ਰੇਡ ${grade} ਨਾਲ ${overall} ਹੈ। ਅਧਿਆਪਕ ਦੀ ਟਿੱਪਣੀ: "${remark}"।`,
+1657:          bn: `${studentName} এর শিক্ষাগত অগ্রগতি গ্রেড ${grade} সহ ${overall}। শিক্ষকের মন্তব্য: "${remark}"।`,
+1658:          ta: `${studentName} இன் கல்வி முன்னேற்றம் தரம் ${grade} உடன் ${overall}. ஆசிரியர் கருத்து: "${remark}".`,
+1659:          te: `${studentName} విద్యా పురోగతి గ్రేడ్ ${grade} తో ${overall}. ఉపాధ్యాయుని వ్యాఖ్య: "${remark}".`,
+1660:          gu: `${studentName} ની શૈક્ષણિક પ્રગતિ ગ્રેડ ${grade} સાથે ${overall} છે. શિક્ષકની નોંધ: "${remark}".`,
+1661:        };
+1663:        const spoken = spokenMap[language] || spokenMap.en;
+1664:        return {
+1665:          query,
+1666:          intent,
+1667:          studentId: student.id,
+1668:          studentName,
+1669:          isMultiChild: false,
+1670:          spokenResponse: spoken,
+1671:          displayResponse: spoken,
+1672:          avatarMood: 'celebrating',
+1673:          detailedData: prog,
+1674:          context,
+1675:        };
+1676:      }
+1678:      case 'TIMETABLE': {
+1679:        const tt = schoolData.data as ClassTimetable;
+1680:        const todaySchedule = tt?.schedule?.[0]?.periods || [];
+1681:        const summary =
+1682:          todaySchedule.length > 0
+1683:            ? todaySchedule.map((p: any) => `${p.subject} (${p.startTime})`).join(', ')
+1684:            : 'Regular schedule';
+1686:        const spokenMap: Record<LanguageCode, string> = {
+1687:          en: `${studentName}'s schedule for today: ${summary}.`,
+1688:          hi: `${studentName} का आज का टाइम-टेबल: ${summary}।`,
+1689:          mr: `${studentName} चे आजचे वेळापत्रक: ${summary}.`,
+1690:          pa: `${studentName} ਦਾ ਅੱਜ ਦਾ ਟਾਈਮ-ਟੇਬਲ: ${summary}।`,
+1691:          bn: `${studentName} এর আজকের সময়সূচী: ${summary}।`,
+1692:          ta: `${studentName} இன் இன்றைய பாடவேளை அட்டவணை: ${summary}.`,
+1693:          te: `${studentName} నేటి సమయ పట్టిక: ${summary}.`,
+1694:          gu: `${studentName} નું આજનું સમયપત્રક: ${summary}.`,
+1695:        };
+1697:        const spoken = spokenMap[language] || spokenMap.en;
+1698:        return {
+1699:          query,
+1700:          intent,
+1701:          studentId: student.id,
+1702:          studentName,
+1703:          isMultiChild: false,
+1704:          spokenResponse: spoken,
+1705:          displayResponse: spoken,
+1706:          avatarMood: 'happy',
+1707:          detailedData: tt,
+1708:          context,
+1709:        };
+1710:      }
+1712:      case 'CHILD_INFORMATION': {
+1713:        const std = schoolData.data;
+1714:        const spokenMap: Record<LanguageCode, string> = {
+1715:          en: `${studentName} is in ${std.class} - Section ${std.section}, Roll Number ${std.rollNumber}. Class Teacher is ${std.classTeacherName}.`,
+1716:          hi: `${studentName}, ${std.class} - सेक्शन ${std.section} में है। रोल नंबर ${std.rollNumber} है और क्लास टीचर ${std.classTeacherName} हैं।`,
+1717:          mr: `${studentName}, ${std.class} - तुकडी ${std.section} मध्ये आहे. हजेरी क्रमांक ${std.rollNumber} आणि वर्गशिक्षक ${std.classTeacherName} आहेत.`,
+1718:          pa: `${studentName}, ${std.class} - ਸੈਕਸ਼ਨ ${std.section} ਵਿੱਚ ਹੈ। ਰੋਲ ਨੰਬਰ ${std.rollNumber} ਹੈ ਅਤੇ ਕਲਾਸ ਟੀਚਰ ${std.classTeacherName} ਹਨ।`,
+1719:          bn: `${studentName}, ${std.class} - সেকশন ${std.section} এ পড়ে। রোল নম্বর ${std.rollNumber} এবং ক্লাস শিক্ষক ${std.classTeacherName}।`,
+1720:          ta: `${studentName}, ${std.class} - பிரிவு ${std.section} இல் உள்ளார். ரோல் எண் ${std.rollNumber}, வகுப்பு ஆசிரியர் ${std.classTeacherName}.`,
+1721:          te: `${studentName}, ${std.class} - సెక్షన్ ${std.section} లో ఉన్నారు. రోల్ నంబర్ ${std.rollNumber}, క్లాస్ టీచర్ ${std.classTeacherName}.`,
+1722:          gu: `${studentName}, ${std.class} - સેક્શન ${std.section} માં છે. રોલ નંબર ${std.rollNumber} છે અને વર્ગ શિક્ષક ${std.classTeacherName} છે.`,
+1723:        };
+1725:        return {
+1726:          query,
+1727:          intent,
+1728:          studentId: student.id,
+1729:          studentName,
+1730:          isMultiChild: false,
+1731:          spokenResponse: spokenMap[language] || spokenMap.en,
+1732:          displayResponse: spokenMap[language] || spokenMap.en,
+1733:          avatarMood: 'happy',
+1734:          detailedData: std,
+1735:          context,
+1736:        };
+1737:      }
+1739:      case 'HOLIDAY_INFORMATION': {
+1740:        const hols = (schoolData.data as any[]) || [];
+1741:        const nextHol = hols[0] || { title: 'Holiday', startDate: 'Upcoming', daysCount: 1 };
+1742:        const spokenMap: Record<LanguageCode, string> = {
+1743:          en: `Next school holiday is for ${nextHol.title} on ${nextHol.startDate} (${nextHol.daysCount} days).`,
+1744:          hi: `स्कूल में अगली छुट्टी ${nextHol.title} की है, ${nextHol.startDate} से (${nextHol.daysCount} दिन)।`,
+1745:          mr: `शाळेची पुढची सुट्टी ${nextHol.title} ची आहे, ${nextHol.startDate} पासून (${nextHol.daysCount} दिवस).`,
+1746:          pa: `ਸਕੂਲ ਦੀ ਅਗਲੀ ਛੁੱਟੀ ${nextHol.title} ਦੀ ਹੈ, ${nextHol.startDate} ਤੋਂ (${nextHol.daysCount} ਦਿਨ)।`,
+1747:          bn: `পরবর্তী স্কুল ছুটি ${nextHol.title} এর জন্য, ${nextHol.startDate} থেকে (${nextHol.daysCount} দিন)।`,
+1748:          ta: `அடுத்த பள்ளி விடுமுறை ${nextHol.title} க்காக ${nextHol.startDate} முதல் (${nextHol.daysCount} நாட்கள்).`,
+1749:          te: `తదుపరి పాఠశాల సెలవు ${nextHol.title} కొరకు ${nextHol.startDate} నుండి (${nextHol.daysCount} రోజులు).`,
+1750:          gu: `શાળાની હવે પછીની રજા ${nextHol.title} માટે ${nextHol.startDate} થી (${nextHol.daysCount} દિવસ) છે.`,
+1751:        };
+1753:        return {
+1754:          query,
+1755:          intent,
+1756:          isMultiChild: false,
+1757:          spokenResponse: spokenMap[language] || spokenMap.en,
+1758:          displayResponse: spokenMap[language] || spokenMap.en,
+1759:          avatarMood: 'celebrating',
+1760:          detailedData: hols,
+1761:          context,
+1762:        };
+1763:      }
+1765:      case 'SCHOOL_ANNOUNCEMENT': {
+1766:        const notices = (schoolData.data as any[]) || [];
+1767:        const topNotice = notices[0] || { title: 'Notice', message: 'No current notice' };
+1768:        const noticeMsg = topNotice.content || topNotice.message || '';
+1769:        const spokenMap: Record<LanguageCode, string> = {
+1770:          en: `Latest school notice: ${topNotice.title}. ${noticeMsg}`,
+1771:          hi: `स्कूल का ताज़ा नोटिस: ${topNotice.title}। ${noticeMsg}`,
+1772:          mr: `शाळेची ताजी सूचना: ${topNotice.title}. ${noticeMsg}`,
+1773:          pa: `ਸਕੂਲ ਦਾ ਤਾਜ਼ਾ ਨੋਟਿਸ: ${topNotice.title}। ${noticeMsg}`,
+1774:          bn: `স্কুলের সাম্প্রতিক বিজ্ঞপ্তি: ${topNotice.title}। ${noticeMsg}`,
+1775:          ta: `பள்ளியின் சமீபத்திய அறிவிப்பு: ${topNotice.title}. ${noticeMsg}`,
+1776:          te: `పాఠశాల తాజా నోటీసు: ${topNotice.title}. ${noticeMsg}`,
+1777:          gu: `શાળાની તાજી સૂચના: ${topNotice.title}. ${noticeMsg}`,
+1778:        };
+1780:        return {
+1781:          query,
+1782:          intent,
+1783:          isMultiChild: false,
+1784:          spokenResponse: spokenMap[language] || spokenMap.en,
+1785:          displayResponse: spokenMap[language] || spokenMap.en,
+1786:          avatarMood: 'happy',
+1787:          detailedData: notices,
+1788:          context,
+1789:        };
+1790:      }
+1792:      case 'GENERAL_SCHOOL_INFORMATION': {
+1793:        const school = schoolData.data || {};
+1794:        const spokenMap: Record<LanguageCode, string> = {
+1795:          en: `${school.name} is located in ${school.city}. School timings are 8:00 AM to 2:00 PM. Helpline: ${school.phone}.`,
+1796:          hi: `${school.name}, ${school.city} में स्थित है। स्कूल का समय सुबह 8:00 बजे से दोपहर 2:00 बजे तक है। हेल्पलाइन: ${school.phone}।`,
+1797:          mr: `${school.name}, ${school.city} येथे आहे. शाळेची वेळ सकाळी 8:00 ते दुपारी 2:00 पर्यंत आहे. हेल्पलाईन: ${school.phone}.`,
+1798:          pa: `${school.name}, ${school.city} ਵਿੱਚ ਸਥਿਤ ਹੈ। ਸਕੂਲ ਦਾ ਸਮਾਂ ਸਵੇਰੇ 8:00 ਤੋਂ ਦੁਪਹਿਰ 2:00 ਵਜੇ ਤੱਕ ਹੈ। ਹੈਲਪਲਾਈਨ: ${school.phone}।`,
+1799:          bn: `${school.name}, ${school.city} এ অবস্থিত। স্কুলের সময় সকাল ৮:০০ থেকে দুপুর ২:০০ পর্যন্ত। হেল্পলাইন: ${school.phone}।`,
+1800:          ta: `${school.name}, ${school.city} இல் அமைந்துள்ளது. பள்ளி நேரம் காலை 8:00 முதல் பிற்பகல் 2:00 வரை. உதவி எண்: ${school.phone}.`,
+1801:          te: `${school.name}, ${school.city} లో ఉంది. పాఠశాల సమయం ఉదయం 8:00 నుండి మధ్యాహ్నం 2:00 వరకు. హెల్ప్‌లైన్: ${school.phone}.`,
+1802:          gu: `${school.name}, ${school.city} માં આવેલી છે. શાળાનો સમય સવારે 8:00 થી બપોરે 2:00 સુધીનો છે. હેલ્પલાઇન: ${school.phone}.`,
+1803:        };
+1805:        return {
+1806:          query,
+1807:          intent,
+1808:          isMultiChild: false,
+1809:          spokenResponse: spokenMap[language] || spokenMap.en,
+1810:          displayResponse: spokenMap[language] || spokenMap.en,
+1811:          avatarMood: 'happy',
+1812:          detailedData: school,
+1813:          context,
+1814:        };
+1815:      }
+1817:      default: {
+1818:        const fallbackMap: Record<LanguageCode, string> = {
+1819:          en: `I couldn't retrieve that information from your school yet.`,
+1820:          hi: `मुझे आपके स्कूल से अभी यह जानकारी नहीं मिली है।`,
+1821:          mr: `मला तुमच्या शाळेकडून अद्याप ही माहिती मिळालेली नाही.`,
+1822:          pa: `ਮੈਨੂੰ ਤੁਹਾਡੇ ਸਕੂਲ ਤੋਂ ਅਜੇ ਇਹ ਜਾਣਕਾਰੀ ਨਹੀਂ ਮਿਲੀ।`,
+1823:          bn: `আমি আপনার স্কুল থেকে এখনও এই তথ্য পাইনি।`,
+1824:          ta: `உங்கள் பள்ளியிலிருந்து அந்த விவரம் இன்னும் வரவில்லை.`,
+1825:          te: `మీ పాఠశాల నుండి ఆ సమాచారం ఇంకా అందలేదు.`,
+1826:          gu: `મને તમારી શાળામાંથી હજી આ માહિતી મળી નથી.`,
+1827:        };
+1828:        const fallback = fallbackMap[language] || fallbackMap.en;
+1829:        return {
+1830:          query,
+1831:          intent,
+1832:          isMultiChild: false,
+1833:          spokenResponse: fallback,
+1834:          displayResponse: fallback,
+1835:          avatarMood: 'concerned',
+1836:          context,
+1837:        };
+1838:      }
+1839:    }
+1840:  }
+1842:  /**
+1843:   * Helper: Format multi-child responses succinctly across languages
+1844:   */
+1845:  private static formatMultiChildResponse(
+1846:    query: string,
+1847:    intent: AIIntent,
+1848:    kids: Student[],
+1849:    language: LanguageCode,
+1850:    context: ConversationContext,
+1851:    multiChildRecords?: { child: Student; data: any }[]
+1852:  ): AIResponseResult {
+1853:    if (intent === 'EXAM_SCHEDULE') {
+1854:      const examSummaries = (multiChildRecords || kids.map((k) => ({ child: k, data: [] }))).map(
+1855:        ({ child, data }) => {
+1856:          const name = this.getLocalizedStudentName(child.name, language);
+1857:          const exams = Array.isArray(data) ? data : [];
+1858:          if (exams.length === 0) {
+1859:            return { name, hasExam: false, subject: '', date: '', time: '' };
+1860:          }
+1861:          const top = exams[0];
+1862:          return { name, hasExam: true, subject: top.subject, date: top.date, time: top.time };
+1863:        }
+1864:      );
+1866:      const spokenMap: Record<LanguageCode, string> = {
+1867:        en:
+1868:          examSummaries
+1869:            .map((s) =>
+1870:              s.hasExam
+1871:                ? `${s.name}'s next exam is ${s.subject} on ${s.date}`
+1872:                : `${s.name} has no upcoming exams`
+1873:            )
+1874:            .join(', and ') + '.',
+1875:        hi:
+1876:          examSummaries
+1877:            .map((s) =>
+1878:              s.hasExam
+1879:                ? `${s.name} का अगला एग्जाम ${s.subject} का ${s.date} को है`
+1880:                : `${s.name} का कोई आगामी एग्जाम नहीं है`
+1881:            )
+1882:            .join(', और ') + '।',
+1883:        mr:
+1884:          examSummaries
+1885:            .map((s) =>
+1886:              s.hasExam
+1887:                ? `${s.name} ची पुढची परीक्षा ${s.date} रोजी ${s.subject} ची आहे`
+1888:                : `${s.name} ची कोणतीही आगामी परीक्षा नाही`
+1889:            )
+1890:            .join(', आणि ') + '.',
+1891:        pa:
+1892:          examSummaries
+1893:            .map((s) =>
+1894:              s.hasExam
+1895:                ? `${s.name} ਦੀ ਅਗਲੀ ਪ੍ਰੀਖਿਆ ${s.date} ਨੂੰ ${s.subject} ਦੀ ਹੈ`
+1896:                : `${s.name} ਦੀ ਕੋਈ ਪ੍ਰੀਖਿਆ ਨਹੀਂ ਹੈ`
+1897:            )
+1898:            .join(', ਅਤੇ ') + '।',
+1899:        bn:
+1900:          examSummaries
+1901:            .map((s) =>
+1902:              s.hasExam
+1903:                ? `${s.name} এর পরবর্তী পরীক্ষা ${s.date} তারিখে ${s.subject} এর`
+1904:                : `${s.name} এর কোনো আসন্ন পরীক্ষা নেই`
+1905:            )
+1906:            .join(', এবং ') + '।',
+1907:        ta:
+1908:          examSummaries
+1909:            .map((s) =>
+1910:              s.hasExam
+1911:                ? `${s.name} இன் அடுத்த தேர்வு ${s.date} அன்று ${s.subject} ஆகும்`
+1912:                : `${s.name} க்கு தேர்வுகள் இல்லை`
+1913:            )
+1914:            .join(', மற்றும் ') + '.',
+1915:        te:
+1916:          examSummaries
+1917:            .map((s) =>
+1918:              s.hasExam
+1919:                ? `${s.name} తదుపరి పరీక్ష ${s.date} న ${s.subject}`
+1920:                : `${s.name} కి ఎలాంటి పరీక్షలు లేవు`
+1921:            )
+1922:            .join(', మరియు ') + '.',
+1923:        gu:
+1924:          examSummaries
+1925:            .map((s) =>
+1926:              s.hasExam
+1927:                ? `${s.name} ની આગામી પરીક્ષા ${s.date} ના રોજ ${s.subject} ની છે`
+1928:                : `${s.name} ની કોઈ પરીક્ષા નથી`
+1929:            )
+1930:            .join(', અને ') + '.',
+1931:      };
+1933:      return {
+1934:        query,
+1935:        intent,
+1936:        isMultiChild: true,
+1937:        spokenResponse: spokenMap[language] || spokenMap.en,
+1938:        displayResponse: spokenMap[language] || spokenMap.en,
+1939:        avatarMood: 'happy',
+1940:        detailedData: kids,
+1941:        context,
+1942:      };
+1943:    }
+1945:    if (intent === 'ATTENDANCE') {
+1946:      const parts = kids.map((k) => {
+1947:        const name = this.getLocalizedStudentName(k.name, language);
+1948:        const isPres = k.presentToday;
+1949:        const presWordMap: Record<LanguageCode, string> = {
+1950:          en: isPres ? 'is present' : 'is absent',
+1951:          hi: isPres ? 'उपस्थित है' : 'अनुपस्थित है',
+1952:          mr: isPres ? 'हजर आहे' : 'गैरहजर आहे',
+1953:          pa: isPres ? 'ਹਾਜ਼ਰ ਹੈ' : 'ਗ਼ੈਰ-ਹਾਜ਼ਰ ਹੈ',
+1954:          bn: isPres ? 'উপস্থিত আছে' : 'অনুপস্থিত আছে',
+1955:          ta: isPres ? 'வந்துள்ளார்' : 'வரவில்லை',
+1956:          te: isPres ? 'హాజరయ్యారు' : 'హాజరుకాలேదు',
+1957:          gu: isPres ? 'હાજર છે' : 'ગેરહાજર છે',
+1958:        };
+1959:        return `${name} ${presWordMap[language] || presWordMap.en}`;
+1960:      });
+1962:      const spokenMap: Record<LanguageCode, string> = {
+1963:        en: `Today's attendance: ${parts.join(', and ')}.`,
+1964:        hi: `आज की उपस्थिति: ${parts.join(', और ')}।`,
+1965:        mr: `आजची हजेरी: ${parts.join(', आणि ')}.`,
+1966:        pa: `ਅੱਜ ਦੀ ਹਾਜ਼ਰੀ: ${parts.join(', ਅਤੇ ')}।`,
+1967:        bn: `আজকের উপস্থিতি: ${parts.join(', এবং ')}।`,
+1968:        ta: `இன்றைய வருகை விவரம்: ${parts.join(', மற்றும் ')}.`,
+1969:        te: `నేటి హాజరు: ${parts.join(', మరియు ')}.`,
+1970:        gu: `આજની હાજરી: ${parts.join(', અને ')}.`,
+1971:      };
+1973:      const allPresent = kids.every((k) => k.presentToday);
+1975:      return {
+1976:        query,
+1977:        intent,
+1978:        isMultiChild: true,
+1979:        spokenResponse: spokenMap[language] || spokenMap.en,
+1980:        displayResponse: spokenMap[language] || spokenMap.en,
+1981:        avatarMood: allPresent ? 'happy' : 'concerned',
+1982:        detailedData: kids,
+1983:        context,
+1984:      };
+1985:    }
+1987:    // Default Multi-Child: Homework
+1988:    const summaries = (multiChildRecords || kids.map((k) => ({ child: k, data: [] }))).map(
+1989:      ({ child, data }) => {
+1990:        const name = this.getLocalizedStudentName(child.name, language);
+1991:        const cls = child.class.replace('Class ', '');
+1992:        const hwList = Array.isArray(data) ? data.filter((h) => !h.isCompleted) : [];
+1993:        if (hwList.length === 0) {
+1994:          return { name, cls, sec: child.section, hasHw: false, subject: '', title: '', desc: '' };
+1995:        }
+1996:        const top = hwList[0];
+1997:        return {
+1998:          name,
+1999:          cls,
+2000:          sec: child.section,
+2001:          hasHw: true,
+2002:          subject: top.subject,
+2003:          title: top.title,
+2004:          desc: top.description,
+2005:        };
+2006:      }
+2007:    );
+2009:    const spokenMap: Record<LanguageCode, string> = {
+2010:      en:
+2011:        summaries
+2012:          .map((s) =>
+2013:            s.hasHw
+2014:              ? `${s.name} (Class ${s.cls}-${s.sec}) has ${s.subject} ${s.title}: ${s.desc}`
+2015:              : `${s.name} has no pending homework`
+2016:          )
+2017:          .join(', and ') + '.',
+2018:      hi:
+2019:        summaries
+2020:          .map((s) =>
+2021:            s.hasHw
+2022:              ? `${s.name} (कक्षा ${s.cls}-${s.sec}) का ${s.subject} में ${s.title} (${s.desc}) है`
+2023:              : `${s.name} का कोई पेंडिंग होमवर्क नहीं है`
+2024:          )
+2025:          .join(', और ') + '।',
+2026:      mr:
+2027:        summaries
+2028:          .map((s) =>
+2029:            s.hasHw
+2030:              ? `${s.name} (वर्ग ${s.cls}-${s.sec}) ला ${s.subject} मध्ये ${s.title} (${s.desc}) आहे`
+2031:              : `${s.name} ला कोणताही गृहपाठ नाही`
+2032:          )
+2033:          .join(', आणि ') + '.',
+2034:      pa:
+2035:        summaries
+2036:          .map((s) =>
+2037:            s.hasHw
+2038:              ? `${s.name} (ਕਲਾਸ ${s.cls}-${s.sec}) ਦਾ ${s.subject} ਵਿੱਚ ${s.title} (${s.desc}) ਹੈ`
+2039:              : `${s.name} ਦਾ ਕੋਈ ਹੋਮਵਰਕ ਨਹੀਂ ਹੈ`
+2040:          )
+2041:          .join(', ਅਤੇ ') + '।',
+2042:      bn:
+2043:        summaries
+2044:          .map((s) =>
+2045:            s.hasHw
+2046:              ? `${s.name} (ক্লাস ${s.cls}-${s.sec}) এর ${s.subject} এ ${s.title} (${s.desc}) আছে`
+2047:              : `${s.name} এর কোনো হোমওয়ার্ক নেই`
+2048:          )
+2049:          .join(', এবং ') + '।',
+2050:      ta:
+2051:        summaries
+2052:          .map((s) =>
+2053:            s.hasHw
+2054:              ? `${s.name} (${s.cls}-${s.sec}) க்கு ${s.subject} ${s.title}: ${s.desc} உள்ளது`
+2055:              : `${s.name} க்கு வீட்டுப்பாடம் இல்லை`
+2056:          )
+2057:          .join(', மற்றும் ') + '.',
+2058:      te:
+2059:        summaries
+2060:          .map((s) =>
+2061:            s.hasHw
+2062:              ? `${s.name} (${s.cls}-${s.sec}) కి ${s.subject} ${s.title}: ${s.desc} ఉంది`
+2063:              : `${s.name} కి హోంవర్క్ లేదు`
+2064:          )
+2065:          .join(', మరియు ') + '.',
+2066:      gu:
+2067:        summaries
+2068:          .map((s) =>
+2069:            s.hasHw
+2070:              ? `${s.name} (ધોરણ ${s.cls}-${s.sec}) નું ${s.subject} માં ${s.title} (${s.desc}) છે`
+2071:              : `${s.name} ને કોઈ લેસન નથી`
+2072:          )
+2073:          .join(', અને ') + '.',
+2074:    };
+2076:    return {
+2077:      query,
+2078:      intent,
+2079:      isMultiChild: true,
+2080:      spokenResponse: spokenMap[language] || spokenMap.en,
+2081:      displayResponse: spokenMap[language] || spokenMap.en,
+2082:      avatarMood: 'happy',
+2083:      detailedData: kids,
+2084:      context,
+2085:    };
+2086:  }
+2088:  /**
+2089:   * 5. Speech-to-Speech Output (Text-to-Speech)
+2090:   */
+2091:  public static async speakResponse(
+2092:    text: string,
+2093:    language: LanguageCode,
+2094:    speed: 'slow' | 'normal' = 'normal'
+2095:  ): Promise<void> {
+2096:    await TextToSpeechService.speak(text, { language, speed });
+2097:  }
+2099:  /**
+2100:   * Stop ongoing speech
+2101:   */
+2102:  public static stopSpeaking(): void {
+2103:    TextToSpeechService.stop();
+2104:  }
+2106:  /**
+2107:   * Get past conversation turns
+2108:   */
+2109:  public static getConversationHistory(): ConversationTurn[] {
+2110:    return conversationMemory.getHistory();
+2111:  }
+2113:  /**
+2114:   * Replay last spoken speech
+2115:   */
+2116:  public static async replayResponse(): Promise<void> {
+2117:    await TextToSpeechService.replay();
+2118:  }
+2120:  /**
+2121:   * Full End-to-End Voice AI Pipeline with Automatic Language Detection & Resolution
+2122:   */
+2123:  public static async processVoiceQuery(
+2124:    rawQuery: string,
+2125:    availableStudents: Student[],
+2126:    preferredLanguage: LanguageCode,
+2127:    activeStudent?: Student | null,
+2128:    options?: VoiceQueryOptions
+2129:  ): Promise<AIResponseResult> {
+2130:    const context = conversationMemory.getContext();
+2132:    // 1. Language Detection & Auto-Switching
+2133:    let effectiveLanguage = preferredLanguage;
+2134:    let isAutoDetected = false;
+2136:    if (options?.autoDetectLanguage !== false) {
+2137:      const detection = await LanguageDetectionService.detect(rawQuery, preferredLanguage);
+2138:      if (detection.confidence >= 0.5) {
+2139:        effectiveLanguage = detection.language;
+2140:        isAutoDetected = true;
+2141:      }
+2142:    }
+2144:    // 2. Detect Intent
+2145:    const intentResult = this.detectIntent(rawQuery, context);
+2147:    // 3. Resolve Student(s)
+2148:    const studentResult = this.resolveStudent(
+2149:      rawQuery,
+2150:      availableStudents,
+2151:      context,
+2152:      activeStudent
+2153:    );
+2155:    // 4. Retrieve Verified School Data
+2156:    const primaryStudent =
+2157:      studentResult.students.length > 0 ? studentResult.students[0] : activeStudent || null;
+2158:    let schoolData: any = null;
+2159:    let multiChildRecords: { child: Student; data: any }[] = [];
+2161:    if (studentResult.mode === 'multi' || studentResult.mode === 'all') {
+2162:      multiChildRecords = await Promise.all(
+2163:        studentResult.students.map(async (child) => {
+2164:          const res = await this.retrieveSchoolData(
+2165:            intentResult.intent,
+2166:            child,
+2167:            intentResult.extractedSubject
+2168:          );
+2169:          return { child, data: res.data };
+2170:        })
+2171:      );
+2172:      schoolData = { data: multiChildRecords, isFound: true };
+2173:    } else {
+2174:      schoolData = await this.retrieveSchoolData(
+2175:        intentResult.intent,
+2176:        primaryStudent,
+2177:        intentResult.extractedSubject
+2178:      );
+2179:    }
+2181:    // 5. Generate Response in the effective language with emotional avatar state
+2182:    const responseResult = this.generateResponse(
+2183:      rawQuery,
+2184:      intentResult,
+2185:      studentResult,
+2186:      schoolData,
+2187:      effectiveLanguage,
+2188:      context,
+2189:      multiChildRecords
+2190:    );
+2192:    responseResult.detectedLanguage = effectiveLanguage;
+2193:    responseResult.isAutoDetected = isAutoDetected;
+2195:    // 6. Update Conversation Context Memory
+2196:    conversationMemory.updateContext({
+2197:      lastIntent: intentResult.intent,
+2198:      lastStudentId: primaryStudent?.id || context.lastStudentId,
+2199:      lastStudentName: primaryStudent?.name || context.lastStudentName,
+2200:      lastSubject: intentResult.extractedSubject || context.lastSubject,
+2201:      lastDateReference: intentResult.dateReference || context.lastDateReference,
+2202:      lastLanguage: effectiveLanguage,
+2203:    });
+2205:    conversationMemory.addTurn({
+2206:      sender: 'user',
+2207:      text: rawQuery,
+2208:      intent: intentResult.intent,
+2209:      studentId: primaryStudent?.id,
+2210:      language: effectiveLanguage,
+2211:      timestamp: Date.now(),
+2212:    });
+2214:    conversationMemory.addTurn({
+2215:      sender: 'assistant',
+2216:      text: responseResult.spokenResponse,
+2217:      intent: intentResult.intent,
+2218:      studentId: primaryStudent?.id,
+2219:      language: effectiveLanguage,
+2220:      timestamp: Date.now(),
+2221:    });
+2223:    return responseResult;
+2224:  }
+2225:}
