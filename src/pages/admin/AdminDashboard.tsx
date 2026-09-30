@@ -19,6 +19,7 @@ import {
   ClipboardList,
   GraduationCap,
   Server,
+  X,
 } from 'lucide-react';
 import {
   Student,
