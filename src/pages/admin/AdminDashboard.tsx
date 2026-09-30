@@ -234,7 +234,7 @@ SSD-2026-9C12,,9,C,12,9871122334`;
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-3 px-4">
           {/* Institution Info */}
           <div className="flex items-center gap-3">
-            <img src="/src/assets/logo.png" alt="Logo" className="w-8 h-8 rounded-full object-cover" />
+            <img src="/src/assets/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-[17px] font-semibold text-white tracking-tight">

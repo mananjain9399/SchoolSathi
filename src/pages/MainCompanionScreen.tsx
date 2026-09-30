@@ -310,7 +310,7 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
       <div className="w-full flex items-center justify-between gap-2 pt-1 pb-2">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <img src="/src/assets/logo.png" alt="Logo" className="w-8 h-8 rounded-full object-cover shadow-sm" />
+          <img src="/src/assets/logo.png" alt="Logo" className="w-10 h-10 object-contain shadow-sm" />
         </div>
 
         {/* Small Current Child Indicator / Dropdown */}
