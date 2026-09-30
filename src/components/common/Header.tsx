@@ -43,26 +43,24 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-orange-100/80 px-4 py-2.5 transition-all">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-[#e0e0e0] px-4 py-3 transition-all">
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
         {/* Brand Logo */}
         <div
           onClick={() => onNavigate('main-companion')}
-          className="flex items-center gap-2.5 cursor-pointer group"
+          className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center text-white shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
-            <span className="text-xl">🦉</span>
-          </div>
+          <img src="/src/assets/logo.png" alt="SchoolSathi Logo" className="w-9 h-9 object-contain group-hover:scale-105 transition-transform" />
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+              <span className="text-[20px] font-semibold tracking-tight text-[#1d1d1f]">
                 SchoolSathi
               </span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wider">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#f0f0f0] text-[#7a7a7a] uppercase tracking-wider">
                 AI Voice
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+            <p className="text-[11px] text-[#7a7a7a] font-medium hidden sm:block mt-0.5">
               {parentName ? `Logged in: ${parentName}` : "Your child's school. Your language."}
             </p>
           </div>
@@ -74,10 +72,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={handleAudioGuide}
             title="Listen in your language"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#fafafc] hover:bg-[#f0f0f0] text-[#1d1d1f] border border-[#e0e0e0] text-[12px] font-semibold active:scale-95 transition-all"
             aria-label="Listen to audio guidance for this screen"
           >
-            <Volume2 className="w-4 h-4 text-amber-600 animate-pulse" />
+            <Volume2 className="w-4 h-4 text-[#0066cc] animate-pulse" />
             <span className="hidden md:inline">Audio Guide</span>
           </button>
 
@@ -85,18 +83,18 @@ export const Header: React.FC<HeaderProps> = ({
           {currentScreen !== 'main-companion' && (
             <button
               onClick={onOpenLanguageModal}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-950 border border-orange-200 text-xs font-bold active:scale-95 transition-all shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#fafafc] hover:bg-[#f0f0f0] text-[#1d1d1f] border border-[#e0e0e0] text-[12px] font-semibold active:scale-95 transition-all"
               aria-label="Change language"
             >
-              <Globe className="w-4 h-4 text-orange-600" />
-              <span className="font-extrabold text-orange-700">{currentLangObj.name}</span>
+              <Globe className="w-4 h-4 text-[#ff3b30]" />
+              <span className="font-semibold">{currentLangObj.name}</span>
             </button>
           )}
 
           {/* School Admin Portal Shortcut */}
           <button
             onClick={() => onNavigate('admin')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition-all shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#1d1d1f] hover:bg-black text-white text-[12px] font-semibold active:scale-95 transition-all cursor-pointer"
             title="Open School Admin & Teacher Portal"
           >
             <span>🏫</span>
@@ -106,16 +104,16 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Screen Switcher Quick Menu */}
           <div className="relative group">
             <button
-              className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+              className="flex items-center gap-1 px-2.5 py-2 rounded-full bg-[#fafafc] hover:bg-[#f0f0f0] text-[#1d1d1f] border border-[#e0e0e0] text-[12px] font-semibold transition-colors"
               title="Quick navigate all screens"
             >
-              <Navigation className="w-4 h-4 text-slate-600" />
-              <span className="hidden lg:inline text-slate-700">Screens</span>
+              <Navigation className="w-4 h-4 text-[#7a7a7a]" />
+              <span className="hidden lg:inline text-[#1d1d1f]">Screens</span>
             </button>
 
             {/* Dropdown Menu */}
-            <div className="absolute right-0 top-full mt-1.5 w-64 py-2 bg-white rounded-2xl shadow-2xl border border-slate-200 hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+            <div className="absolute right-0 top-full mt-2 w-64 py-2 bg-white rounded-[14px] shadow-lg border border-[#e0e0e0] hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="px-4 py-2 text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider border-b border-[#e0e0e0] mb-1">
                 SchoolSathi Navigation
               </div>
               <div className="max-h-80 overflow-y-auto py-1">
@@ -136,10 +134,10 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={s.id}
                     onClick={() => onNavigate(s.id as ScreenId)}
-                    className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 transition-colors ${
+                    className={`w-full text-left px-4 py-2.5 text-[13px] font-medium flex items-center gap-3 transition-colors ${
                       currentScreen === s.id
-                        ? 'bg-orange-50 text-orange-700 font-bold border-l-4 border-orange-500'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        ? 'bg-[#0066cc]/10 text-[#0066cc]'
+                        : 'text-[#1d1d1f] hover:bg-[#f5f5f7]'
                     }`}
                   >
                     <span>{s.icon}</span>

@@ -65,46 +65,46 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({
   return (
     <div className="max-w-md mx-auto px-4 py-4 pb-24 space-y-4">
       {/* Title */}
-      <div className="text-center mb-4">
-        <h2 className="text-2xl font-black text-slate-900">{t.help}</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Everything you need to know about using Sathi</p>
+      <div className="text-center mb-6">
+        <h2 className="text-[24px] font-semibold text-[#1d1d1f] tracking-tight">{t.help}</h2>
+        <p className="text-[14px] text-[#7a7a7a] mt-1">Everything you need to know about using Sathi</p>
       </div>
 
       {/* 1. Large Audio Help Banner */}
-      <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl p-5 text-white shadow-lg shadow-orange-500/20 flex items-center justify-between">
+      <div className="bg-[#fafafc] border border-[#e0e0e0] rounded-[24px] p-6 shadow-sm flex items-center justify-between">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-orange-100 block">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-[#7a7a7a] block mb-1">
             Audio Guide
           </span>
-          <h3 className="text-lg font-black mt-0.5">आवाज़ में सहायता सुनें</h3>
-          <p className="text-xs text-white/90 mt-1 max-w-[220px]">
+          <h3 className="text-[18px] font-semibold text-[#1d1d1f]">आवाज़ में सहायता सुनें</h3>
+          <p className="text-[13px] text-[#7a7a7a] mt-1 max-w-[220px]">
             Tap to hear how to use SchoolSathi in your mother tongue
           </p>
         </div>
 
         <button
           onClick={handleAudioHelp}
-          className="w-14 h-14 rounded-2xl bg-white text-orange-600 flex items-center justify-center shadow-md active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
+          className="w-14 h-14 rounded-full bg-white text-[#0066cc] border border-[#e0e0e0] flex items-center justify-center shadow-sm active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
           title="Play audio help"
         >
-          <Volume2 className="w-7 h-7 animate-pulse" />
+          <Volume2 className="w-6 h-6 animate-pulse" />
         </button>
       </div>
 
       {/* 2. Emergency School Helpline */}
-      <div className="bg-white rounded-3xl p-4 border border-rose-100 shadow-xs flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg">
+      <div className="bg-white rounded-[24px] p-5 border border-[#e0e0e0] shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-[#ff3b30]/10 text-[#ff3b30] flex items-center justify-center">
             <PhoneCall className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-[#ff3b30] uppercase tracking-wider block mb-0.5">
               Direct Helpline
             </span>
-            <h4 className="text-xs sm:text-sm font-black text-slate-800">
+            <h4 className="text-[14px] font-semibold text-[#1d1d1f]">
               School Front Desk Call
             </h4>
-            <span className="text-[11px] text-slate-500 font-medium">
+            <span className="text-[12px] text-[#7a7a7a] font-medium mt-0.5 block">
               +91 11 2569 1234 (8 AM - 3 PM)
             </span>
           </div>
@@ -112,22 +112,22 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({
 
         <a
           href="tel:+911125691234"
-          className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold shadow-xs active:scale-95 transition-all"
+          className="px-4 py-2 bg-[#ff3b30] hover:bg-[#ff3b30]/90 text-white rounded-full text-[13px] font-semibold active:scale-95 transition-all shadow-sm"
         >
           Call School
         </a>
       </div>
 
       {/* 3. How to Talk to Sathi Guide */}
-      <div className="bg-white rounded-3xl p-4 border border-orange-100 shadow-sm space-y-2.5">
+      <div className="bg-white rounded-[24px] p-6 border border-[#e0e0e0] shadow-sm space-y-4">
         <div className="flex items-center gap-2">
-          <Mic className="w-4 h-4 text-orange-600" />
-          <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+          <Mic className="w-5 h-5 text-[#0066cc]" />
+          <h4 className="text-[14px] font-semibold uppercase tracking-wider text-[#1d1d1f]">
             How to Speak to SchoolSathi
           </h4>
         </div>
 
-        <p className="text-xs text-slate-500">
+        <p className="text-[13px] text-[#7a7a7a]">
           Tap any phrase below to hear how naturally you can speak:
         </p>
 
@@ -136,26 +136,26 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({
             <div
               key={idx}
               onClick={() => handlePromptSpeak(q.text)}
-              className="p-3 rounded-2xl bg-orange-50/50 hover:bg-orange-100/70 border border-orange-100 flex items-center justify-between cursor-pointer active:scale-98 transition-all"
+              className="p-4 rounded-[14px] bg-[#fafafc] hover:bg-[#f0f0f0] border border-[#e0e0e0] flex items-center justify-between cursor-pointer active:scale-98 transition-all"
             >
               <div>
-                <span className="text-[10px] font-bold text-orange-800 uppercase block">
+                <span className="text-[11px] font-semibold text-[#7a7a7a] uppercase block mb-1">
                   {q.label}
                 </span>
-                <span className="text-xs font-bold text-slate-800">
+                <span className="text-[14px] font-semibold text-[#1d1d1f]">
                   "{q.text}"
                 </span>
               </div>
-              <Volume2 className="w-4 h-4 text-orange-600" />
+              <Volume2 className="w-5 h-5 text-[#0066cc]" />
             </div>
           ))}
         </div>
       </div>
 
       {/* 4. FAQs Accordion */}
-      <div className="bg-white rounded-3xl p-4 border border-orange-100 shadow-sm space-y-2">
-        <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-2 flex items-center gap-1.5">
-          <HelpCircle className="w-4 h-4 text-orange-600" /> Frequently Asked Questions
+      <div className="bg-white rounded-[24px] p-6 border border-[#e0e0e0] shadow-sm space-y-3">
+        <h4 className="text-[14px] font-semibold uppercase tracking-wider text-[#1d1d1f] mb-3 flex items-center gap-2">
+          <HelpCircle className="w-5 h-5 text-[#0066cc]" /> Frequently Asked Questions
         </h4>
 
         {faqs.map((faq, index) => {
@@ -163,21 +163,21 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({
           return (
             <div
               key={index}
-              className="border-b border-slate-100 last:border-b-0 py-2"
+              className="border-b border-[#e0e0e0] last:border-b-0 py-3"
             >
               <button
                 onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                className="w-full text-left flex items-center justify-between text-xs font-bold text-slate-800 py-1"
+                className="w-full text-left flex items-center justify-between text-[14px] font-semibold text-[#1d1d1f] py-1"
               >
                 <span>{faq.q}</span>
                 <ChevronDown
-                  className={`w-4 h-4 text-slate-400 transition-transform ${
+                  className={`w-4 h-4 text-[#7a7a7a] transition-transform ${
                     isOpen ? 'rotate-180' : ''
                   }`}
                 />
               </button>
               {isOpen && (
-                <p className="text-xs text-slate-600 font-medium mt-1.5 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100 animate-in fade-in duration-150">
+                <p className="text-[13px] text-[#7a7a7a] mt-2 leading-relaxed bg-[#fafafc] p-3 rounded-[10px] border border-[#e0e0e0] animate-in fade-in duration-150">
                   {faq.a}
                 </p>
               )}
@@ -187,12 +187,12 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({
       </div>
 
       {/* Back to Companion Button */}
-      <div className="pt-1">
+      <div className="pt-2">
         <button
           onClick={() => onNavigate('main-companion')}
-          className="w-full py-3 rounded-2xl bg-orange-100 hover:bg-orange-200 text-orange-900 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all"
+          className="w-full h-[50px] rounded-full bg-[#f0f0f0] hover:bg-[#e0e0e0] text-[#1d1d1f] text-[15px] font-semibold flex items-center justify-center gap-2 transition-all active:scale-95"
         >
-          <Sparkles className="w-4 h-4" />
+          <Sparkles className="w-4 h-4 text-[#0066cc]" />
           <span>Talk to Sathi Now</span>
         </button>
       </div>

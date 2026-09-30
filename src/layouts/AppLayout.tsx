@@ -36,7 +36,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   ].includes(currentScreen);
 
   return (
-    <div className="min-h-screen bg-[#FCF9F4] text-[#1E293B] flex flex-col font-sans relative selection:bg-orange-200">
+    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f] flex flex-col font-sans relative selection:bg-[#0066cc]/20">
       {/* Top Header */}
       <Header
         currentLanguage={language}
