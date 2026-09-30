@@ -17,6 +17,7 @@ import { VoiceInputBar } from '../components/voice/VoiceInputBar';
 import { SpeechResponseCard } from '../components/voice/SpeechResponseCard';
 import { VoiceSettingsModal } from '../components/voice/VoiceSettingsModal';
 import { VoiceService } from '../services/voice/VoiceService';
+import logoUrl from '../assets/logo.png';
 import {
   Student,
   AvatarState,
@@ -310,7 +311,7 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
       <div className="w-full flex items-center justify-between gap-2 pt-1 pb-2">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <img src="/src/assets/logo.png" alt="Logo" className="w-10 h-10 object-contain shadow-sm" />
+          <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain shadow-sm" />
         </div>
 
         {/* Small Current Child Indicator / Dropdown */}

@@ -3,6 +3,7 @@ import { Volume2, Globe, Navigation, User } from 'lucide-react';
 import { LanguageCode, ScreenId } from '../../types';
 import { SUPPORTED_LANGUAGES } from '../../data/languages';
 import { SpeechService } from '../../services/speechService';
+import logoUrl from '../../assets/logo.png';
 
 interface HeaderProps {
   currentLanguage: LanguageCode;
@@ -50,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => onNavigate('main-companion')}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <img src="/src/assets/logo.png" alt="SchoolSathi Logo" className="w-10 h-10 object-contain group-hover:scale-105 transition-transform" />
+          <img src={logoUrl} alt="SchoolSathi Logo" className="w-10 h-10 object-contain group-hover:scale-105 transition-transform" />
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-[20px] font-semibold tracking-tight text-[#1d1d1f]">
