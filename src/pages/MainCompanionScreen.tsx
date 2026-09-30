@@ -308,11 +308,16 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
       {/* 1. MINIMAL HEADER: Small Current Child + Small Language  */}
       {/* ======================================================== */}
       <div className="w-full flex items-center justify-between gap-2 pt-1 pb-2">
+        {/* Logo */}
+        <div className="flex items-center gap-2">
+          <img src="/src/assets/logo.png" alt="Logo" className="w-8 h-8 rounded-full object-cover shadow-sm" />
+        </div>
+
         {/* Small Current Child Indicator / Dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowChildDropdown(!showChildDropdown)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 hover:bg-orange-100/80 border border-orange-200/80 text-xs font-bold text-slate-800 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            className="apple-btn-ghost text-xs"
             title="Switch Child"
           >
             <span className="text-sm">{isAllMode ? '👨‍👧‍👦' : '👦'}</span>
@@ -323,13 +328,13 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
                   : `All Children (${students.length})`
                 : `${studentFirstName} (${currentStudent?.class || ''}-${currentStudent?.section || ''})`}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#969696]" />
           </button>
 
           {/* Child Dropdown Menu */}
           {showChildDropdown && (
-            <div className="absolute left-0 top-full mt-1.5 w-60 bg-white rounded-2xl shadow-xl border border-orange-200 p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 block">
+            <div className="absolute left-0 top-full mt-2 w-60 apple-glass-panel p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+              <span className="text-[12px] font-semibold text-[#7a7a7a] px-2 py-1 block">
                 Select Child:
               </span>
 
@@ -340,15 +345,15 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
                     onSelectStudent('all');
                     setShowChildDropdown(false);
                   }}
-                  className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold transition-colors ${
-                    isAllMode ? 'bg-orange-100 text-orange-950' : 'hover:bg-slate-50 text-slate-700'
+                  className={`w-full flex items-center justify-between p-2 rounded-lg text-[14px] transition-colors ${
+                    isAllMode ? 'bg-[#0066cc]/10 text-[#0066cc]' : 'hover:bg-[#f0f0f0] text-[#1d1d1f]'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span>👨‍👧‍👦</span>
                     <span>{language === 'hi' ? 'दोनों बच्चे (सभी)' : 'All Children (Together)'}</span>
                   </div>
-                  {isAllMode && <Check className="w-3.5 h-3.5 text-orange-600" />}
+                  {isAllMode && <Check className="w-4 h-4 text-[#0066cc]" />}
                 </button>
               )}
 
@@ -362,26 +367,26 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
                       onSelectStudent(std.id);
                       setShowChildDropdown(false);
                     }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold transition-colors ${
-                      isSelected ? 'bg-orange-100 text-orange-950' : 'hover:bg-slate-50 text-slate-700'
+                    className={`w-full flex items-center justify-between p-2 rounded-lg text-[14px] transition-colors ${
+                      isSelected ? 'bg-[#0066cc]/10 text-[#0066cc]' : 'hover:bg-[#f0f0f0] text-[#1d1d1f]'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span>{std.gender === 'female' ? '👧' : '👦'}</span>
                       <span className="truncate">{std.name} ({std.class}-{std.section})</span>
                     </div>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-orange-600" />}
+                    {isSelected && <Check className="w-4 h-4 text-[#0066cc]" />}
                   </button>
                 );
               })}
 
-              <div className="border-t border-slate-100 mt-1 pt-1 space-y-1">
+              <div className="border-t border-[#e0e0e0] mt-1 pt-1 space-y-1">
                 <button
                   onClick={() => {
                     setShowChildDropdown(false);
                     onNavigate('add-child');
                   }}
-                  className="w-full flex items-center gap-1.5 p-2 rounded-xl text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors"
+                  className="w-full flex items-center gap-1.5 p-2 text-[14px] text-[#0066cc] rounded-lg hover:bg-[#0066cc]/10 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{language === 'hi' ? '+ नया बच्चा जोड़ें (Add Child)' : '+ Add Child Details'}</span>
@@ -391,7 +396,7 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
                     setShowChildDropdown(false);
                     onNavigate('verify-child');
                   }}
-                  className="w-full flex items-center gap-1.5 p-1.5 rounded-xl text-[11px] font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+                  className="w-full flex items-center gap-1.5 p-1.5 text-[12px] text-[#7a7a7a] rounded-lg hover:bg-[#f0f0f0] transition-colors"
                 >
                   <span>🔍 {language === 'hi' ? 'स्कूल आईडी से ढूंढें' : 'Verify with School ID'}</span>
                 </button>
@@ -404,21 +409,21 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
           {/* Voice Settings Pill Button */}
           <button
             onClick={() => setShowVoiceSettingsModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-orange-50 border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            className="apple-btn-ghost text-xs"
             title="Voice Settings"
             id="open-voice-settings-btn"
           >
-            <Volume2 className="w-3.5 h-3.5 text-orange-600" />
-            <span className="capitalize">{voiceSettings.gender === 'female' ? '👩 Female' : '👨 Male'}</span>
+            <Volume2 className="w-3.5 h-3.5" />
+            <span className="capitalize hidden sm:inline">{voiceSettings.gender === 'female' ? '👩 Female' : '👨 Male'}</span>
           </button>
 
           {/* Small Language Pill Indicator */}
           <button
             onClick={onOpenLanguageModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-orange-50 border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            className="apple-btn-ghost text-xs"
             title="Change Language"
           >
-            <Globe className="w-3.5 h-3.5 text-orange-600" />
+            <Globe className="w-3.5 h-3.5" />
             <span>{currentLangObj.name}</span>
           </button>
         </div>
@@ -463,9 +468,9 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
           />
         </div>
 
-        {/* Warm Spoken Guidance Subtitle */}
+        {/* Guidance Subtitle */}
         <div className="text-center mt-3 max-w-xs">
-          <p className="text-sm font-bold text-slate-700">
+          <p className="text-[14px] text-[#7a7a7a] font-normal">
             {isAllMode
               ? language === 'hi'
                 ? `पूछिए अपने दोनों बच्चों के बारे में`
@@ -478,8 +483,8 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
 
         {/* Dynamic Loading Stage Indicator */}
         {loadingStage && (
-          <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-full bg-orange-50 border border-orange-200 text-orange-800 text-xs font-semibold animate-pulse my-2">
-            <Sparkles className="w-3.5 h-3.5 text-orange-600 animate-spin" />
+          <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-full bg-[#f5f5f7] border border-[#e0e0e0] text-[#0066cc] text-[12px] font-medium animate-pulse my-2">
+            <Sparkles className="w-3.5 h-3.5 text-[#0066cc] animate-spin" />
             <span>{loadingStage}</span>
           </div>
         )}
@@ -538,12 +543,12 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
       {/*    📅 Holidays, 🏫 Announcements (Never replacing voice)  */}
       {/* ======================================================== */}
       <div className="w-full mt-1">
-        <div className="flex flex-wrap gap-1.5 justify-center">
+        <div className="flex flex-wrap gap-2 justify-center">
           {quickActions.map((qa) => (
             <button
               key={qa.id}
               onClick={() => handleProcessVoiceQuery(qa.query)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-orange-50 border border-orange-200/80 text-xs font-bold text-slate-700 shadow-2xs hover:shadow-xs active:scale-95 transition-all cursor-pointer"
+              className="apple-btn-secondary px-3 py-1.5 text-[14px]"
             >
               <span className="text-sm">{qa.icon}</span>
               <span>{qa.label}</span>
@@ -559,11 +564,11 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
         <div className="mt-3">
           <button
             onClick={() => setShowRecentHistory(true)}
-            className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-orange-600 bg-slate-100/80 hover:bg-orange-50 px-3 py-1 rounded-full border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+            className="apple-btn-ghost text-[#7a7a7a]"
           >
-            <History className="w-3.5 h-3.5 text-orange-500" />
+            <History className="w-4 h-4 text-[#7a7a7a]" />
             <span>
-              {language === 'hi' ? 'हाल की बातचीत' : 'Recent conversation'} ({Math.floor(conversationHistory.length / 2)})
+              {language === 'hi' ? 'हाल की बातचीत' : 'Recent Conversation'} ({Math.floor(conversationHistory.length / 2)})
             </span>
           </button>
         </div>
@@ -571,24 +576,24 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
 
       {/* Recent Conversation Drawer */}
       {showRecentHistory && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-orange-100 animate-in slide-in-from-bottom duration-300 max-h-[75vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="apple-glass-panel w-full max-w-md p-6 animate-in slide-in-from-bottom duration-300 max-h-[75vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-[#e0e0e0]">
               <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-orange-600" />
-                <h4 className="text-sm font-black text-slate-800">
+                <History className="w-5 h-5 text-[#0066cc]" />
+                <h4 className="text-[17px] font-semibold text-[#1d1d1f]">
                   {language === 'hi' ? 'हाल की बातचीत' : 'Recent Conversation'}
                 </h4>
               </div>
               <button
                 onClick={() => setShowRecentHistory(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer"
+                className="apple-icon-btn w-8 h-8"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 overflow-y-auto py-3 pr-1 flex-1 text-xs">
+            <div className="space-y-4 overflow-y-auto py-4 pr-1 flex-1 text-[14px]">
               {conversationHistory.map((turn, idx) => (
                 <div
                   key={idx}
@@ -597,14 +602,14 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
                   }`}
                 >
                   <div
-                    className={`max-w-[85%] p-3 rounded-2xl ${
+                    className={`max-w-[85%] p-3.5 rounded-[18px] ${
                       turn.sender === 'user'
-                        ? 'bg-orange-500 text-white rounded-br-xs font-semibold'
-                        : 'bg-orange-50 text-slate-800 rounded-bl-xs border border-orange-200 font-bold'
+                        ? 'bg-[#0066cc] text-white rounded-br-[4px]'
+                        : 'bg-[#f5f5f7] text-[#1d1d1f] rounded-bl-[4px]'
                     }`}
                   >
                     {turn.sender === 'assistant' && (
-                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded-md inline-block mb-1">
+                      <span className="text-[10px] font-semibold text-[#0066cc] bg-[#0066cc]/10 px-2 py-1 rounded-full inline-block mb-1.5">
                         ✓ Based on school records
                       </span>
                     )}
@@ -614,10 +619,10 @@ export const MainCompanionScreen: React.FC<MainCompanionScreenProps> = ({
               ))}
             </div>
 
-            <div className="pt-2 border-t border-slate-100 text-center">
+            <div className="pt-4 border-t border-[#e0e0e0] text-center">
               <button
                 onClick={() => setShowRecentHistory(false)}
-                className="w-full py-2 bg-orange-500 text-white rounded-xl text-xs font-bold hover:bg-orange-600 cursor-pointer"
+                className="apple-btn-secondary w-full"
               >
                 Close
               </button>

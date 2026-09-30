@@ -161,30 +161,30 @@ export const DataSourcesTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="border-b border-[#e0e0e0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="text-xs font-bold text-orange-400 uppercase tracking-wider block mb-1">
+          <span className="text-[12px] font-semibold text-[#0066cc] uppercase block mb-1">
             Enterprise Architecture
           </span>
-          <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-            <Server className="w-6 h-6 text-orange-500" />
+          <h2 className="text-[24px] font-semibold text-[#1d1d1f] flex items-center gap-2">
+            <Server className="w-6 h-6 text-[#0066cc]" />
             <span>Data Sources & School ERP Integration</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            AI communicates exclusively with the <code className="text-orange-300 font-mono">SchoolDataProvider</code> abstraction. Multiple data sources supported without changing parent voice logic.
+          <p className="text-[14px] text-[#7a7a7a] mt-1">
+            AI communicates exclusively with the <code className="bg-[#f0f0f0] px-1.5 py-0.5 rounded text-[#1d1d1f] font-mono">SchoolDataProvider</code> abstraction.
           </p>
         </div>
 
         {health && (
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-2xl">
+          <div className="flex items-center gap-2 bg-[#fafafc] border border-[#e0e0e0] px-4 py-2.5 rounded-[14px]">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
-                health.status === 'healthy' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                health.status === 'healthy' ? 'bg-[#34c759] animate-pulse' : 'bg-[#ff9500]'
               }`}
             />
-            <div className="text-xs">
-              <span className="font-bold text-white block capitalize">{health.status} ({health.latencyMs}ms)</span>
-              <span className="text-[10px] text-slate-400 font-medium">{health.details}</span>
+            <div className="text-[12px]">
+              <span className="font-semibold text-[#1d1d1f] block capitalize">{health.status} ({health.latencyMs}ms)</span>
+              <span className="text-[11px] text-[#7a7a7a] font-medium">{health.details}</span>
             </div>
           </div>
         )}
@@ -192,51 +192,53 @@ export const DataSourcesTab: React.FC = () => {
 
       {/* 1. SELECT DATA PROVIDER IMPLEMENTATION */}
       <div>
-        <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <h3 className="text-[14px] font-semibold text-[#1d1d1f] uppercase flex items-center gap-2 mb-3">
           <span>1. Select Active Data Provider</span>
-          <span className="text-[10px] font-bold text-slate-400 font-mono">(SchoolDataProvider Interface)</span>
+          <span className="text-[11px] font-semibold text-[#7a7a7a] font-mono">(SchoolDataProvider Interface)</span>
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {providerCards.map((card) => {
             const isSelected = activeProviderType === card.type;
             return (
               <div
                 key={card.type}
                 onClick={() => handleSwitchProvider(card.type)}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                className={`p-5 rounded-[18px] border transition-all cursor-pointer relative flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-slate-900 border-orange-500/80 shadow-lg ring-1 ring-orange-500/30'
-                    : 'bg-slate-900/50 hover:bg-slate-900 border-slate-800'
+                    ? 'bg-white border-[#0066cc] shadow-md ring-1 ring-[#0066cc]/30'
+                    : 'bg-[#fafafc] hover:bg-white border-[#e0e0e0]'
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-[12px] bg-[#f0f0f0] border border-[#e0e0e0] flex items-center justify-center">
                         {card.icon}
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-white">{card.title}</h4>
-                        <span className="text-[11px] text-slate-400 font-semibold">{card.subtitle}</span>
+                        <h4 className="text-[16px] font-semibold text-[#1d1d1f]">{card.title}</h4>
+                        <span className="text-[12px] text-[#7a7a7a] font-medium">{card.subtitle}</span>
                       </div>
                     </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${card.tagColor}`}>
+                    <span className={`text-[10px] font-semibold px-2 py-1 rounded-full uppercase ${
+                      isSelected ? 'bg-[#0066cc]/10 text-[#0066cc]' : 'bg-[#e0e0e0] text-[#7a7a7a]'
+                    }`}>
                       {card.tag}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">{card.desc}</p>
+                  <p className="text-[14px] text-[#7a7a7a] mt-3 leading-relaxed">{card.desc}</p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="font-mono text-slate-400 text-[11px]">
-                    Type: <strong className="text-slate-200">{card.type}</strong>
+                <div className="mt-5 pt-4 border-t border-[#e0e0e0] flex items-center justify-between text-[12px]">
+                  <span className="font-mono text-[#7a7a7a]">
+                    Type: <strong className="text-[#1d1d1f]">{card.type}</strong>
                   </span>
                   <button
-                    className={`px-3 py-1 rounded-xl font-bold transition-all text-xs ${
+                    className={`px-4 py-1.5 rounded-full font-semibold transition-all ${
                       isSelected
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                        ? 'bg-[#0066cc] text-white'
+                        : 'bg-[#f0f0f0] hover:bg-[#e0e0e0] text-[#1d1d1f]'
                     }`}
                   >
                     {isSelected ? 'Active Provider' : 'Switch To'}
@@ -249,44 +251,44 @@ export const DataSourcesTab: React.FC = () => {
       </div>
 
       {/* 2. REST API CONTRACT EXPLORER & SANDBOX */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-3xl p-5 space-y-4">
+      <div className="bg-[#fafafc] border border-[#e0e0e0] rounded-[24px] p-6 space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <Code className="w-4 h-4 text-orange-400" />
+            <h3 className="text-[14px] font-semibold text-[#1d1d1f] uppercase flex items-center gap-2">
+              <Code className="w-4 h-4 text-[#0066cc]" />
               <span>2. REST API Contract Explorer & Live Sandbox</span>
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-[12px] text-[#7a7a7a] mt-1">
               Execute live GET requests against the defined contract:
             </p>
           </div>
 
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">
-            Tenant: <strong className="text-orange-400">sch-demo</strong> | Student: <strong className="text-orange-400">std-01 (Rohan)</strong>
+          <span className="text-[11px] font-mono text-[#7a7a7a] bg-white border border-[#e0e0e0] px-3 py-1.5 rounded-[10px]">
+            Tenant: <strong className="text-[#0066cc]">sch-demo</strong> | Student: <strong className="text-[#0066cc]">std-01 (Rohan)</strong>
           </span>
         </div>
 
         {/* Endpoint Selector & Execution Bar */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-3">
           <select
             value={selectedEndpoint}
             onChange={(e) => setSelectedEndpoint(e.target.value)}
-            className="flex-1 bg-slate-950 border border-slate-700 rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm font-mono font-bold text-white focus:outline-none focus:border-orange-500"
+            className="apple-search-input flex-1 font-mono text-[13px]"
           >
-            <option value="homework">GET /students/:studentId/homework (Active Homework)</option>
-            <option value="exams">GET /students/:studentId/exams (Exam Datesheet)</option>
-            <option value="attendance">GET /students/:studentId/attendance (Attendance Record)</option>
-            <option value="progress">GET /students/:studentId/progress (Report Card & Grades)</option>
-            <option value="timetable">GET /students/:studentId/timetable (Periods Schedule)</option>
-            <option value="announcements">GET /students/:studentId/announcements (Circulars)</option>
-            <option value="student">GET /students/:studentId (Student Profile)</option>
-            <option value="holidays">GET /school/holidays (Holiday Calendar)</option>
+            <option value="homework">GET /students/:studentId/homework</option>
+            <option value="exams">GET /students/:studentId/exams</option>
+            <option value="attendance">GET /students/:studentId/attendance</option>
+            <option value="progress">GET /students/:studentId/progress</option>
+            <option value="timetable">GET /students/:studentId/timetable</option>
+            <option value="announcements">GET /students/:studentId/announcements</option>
+            <option value="student">GET /students/:studentId</option>
+            <option value="holidays">GET /school/holidays</option>
           </select>
 
           <button
             onClick={handleRunSandbox}
             disabled={isLoadingSandbox}
-            className="px-5 py-2.5 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-95"
+            className="apple-btn-primary h-[44px] px-6"
           >
             {isLoadingSandbox ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             <span>Execute Request</span>
@@ -295,18 +297,18 @@ export const DataSourcesTab: React.FC = () => {
 
         {/* Live Payload Preview */}
         {sandboxResponse && (
-          <div className="bg-slate-950 rounded-2xl border border-slate-800 p-4 space-y-2 font-mono text-xs animate-in fade-in duration-200">
-            <div className="flex items-center justify-between text-[11px] pb-2 border-b border-slate-800 text-slate-400">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+          <div className="bg-white rounded-[14px] border border-[#e0e0e0] p-5 space-y-3 font-mono text-[12px] animate-in fade-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-[#e0e0e0] text-[#7a7a7a]">
+              <div className="flex items-center gap-3">
+                <span className="px-2.5 py-1 rounded-[6px] bg-[#34c759]/10 text-[#34c759] font-semibold">
                   HTTP {sandboxResponse.status} {sandboxResponse.statusText}
                 </span>
-                <span>Active Provider: <strong className="text-white">{activeProviderType}</strong></span>
+                <span>Active Provider: <strong className="text-[#1d1d1f]">{activeProviderType}</strong></span>
               </div>
               <span>Headers: X-School-ID: sch-demo</span>
             </div>
 
-            <pre className="text-slate-300 overflow-x-auto max-h-56 p-2 rounded-xl bg-slate-900/60 leading-relaxed text-[11px]">
+            <pre className="text-[#1d1d1f] overflow-x-auto max-h-64 p-3 rounded-[10px] bg-[#f5f5f7] leading-relaxed">
               {JSON.stringify(sandboxResponse.payload, null, 2)}
             </pre>
           </div>
@@ -314,19 +316,19 @@ export const DataSourcesTab: React.FC = () => {
       </div>
 
       {/* 3. REAL-TIME WEBHOOK INGESTION ENGINE */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-3xl p-5 space-y-4">
+      <div className="bg-[#fafafc] border border-[#e0e0e0] rounded-[24px] p-6 space-y-5">
         <div>
-          <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
-            <Activity className="w-4 h-4 text-purple-400" />
+          <h3 className="text-[14px] font-semibold text-[#1d1d1f] uppercase flex items-center gap-2">
+            <Activity className="w-4 h-4 text-[#af52de]" />
             <span>3. Real-Time Webhook Simulator (School ERP ➔ SchoolSathi ➔ Parent AI)</span>
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-[12px] text-[#7a7a7a] mt-1">
             Test immediate data delivery when school ERP emits real-time events. Parent AI instantly responds with the updated data.
           </p>
         </div>
 
         {/* Event Trigger Buttons */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {[
             { id: 'homework.updated', label: 'Push homework.updated', icon: '📚' },
             { id: 'exam.created', label: 'Push exam.created', icon: '📝' },
@@ -337,7 +339,7 @@ export const DataSourcesTab: React.FC = () => {
               key={btn.id}
               onClick={() => handleTriggerWebhook(btn.id)}
               disabled={isSimulatingWebhook}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 active:scale-95 transition-all cursor-pointer"
+              className="flex items-center gap-2 apple-btn-secondary h-[36px] px-4"
             >
               <span>{btn.icon}</span>
               <span>{btn.label}</span>
@@ -347,21 +349,21 @@ export const DataSourcesTab: React.FC = () => {
 
         {/* Recent Webhook Deliveries */}
         {webhookLog.length > 0 && (
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+          <div className="space-y-2">
+            <span className="text-[11px] font-semibold text-[#7a7a7a] uppercase tracking-wider block">
               Recent Webhook Ingestions (HMAC Verified):
             </span>
-            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
               {webhookLog.map((log, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono"
+                  className="flex items-center justify-between p-3 rounded-[12px] bg-white border border-[#e0e0e0] text-[12px] font-mono shadow-sm"
                 >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span className="text-slate-200">{log.message}</span>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-4 h-4 text-[#34c759] shrink-0" />
+                    <span className="text-[#1d1d1f] font-medium">{log.message}</span>
                   </div>
-                  <span className="text-[10px] text-slate-500">{new Date(log.processedAt).toLocaleTimeString()}</span>
+                  <span className="text-[11px] text-[#7a7a7a]">{new Date(log.processedAt).toLocaleTimeString()}</span>
                 </div>
               ))}
             </div>
@@ -370,44 +372,44 @@ export const DataSourcesTab: React.FC = () => {
       </div>
 
       {/* 4. SECURITY & AUDIT TRAIL MONITOR */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-3xl p-5 space-y-3">
+      <div className="bg-white border border-[#e0e0e0] rounded-[24px] p-6 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-[14px] font-semibold text-[#1d1d1f] uppercase flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#34c759]" />
             <span>4. Security & Audit Logging (SLAC & Multi-School Isolation)</span>
           </h3>
-          <span className="text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+          <span className="text-[11px] font-semibold bg-[#34c759]/10 text-[#34c759] border border-[#34c759]/20 px-3 py-1 rounded-full">
             Zero Cross-School Leakage Verified
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
-            <thead>
-              <tr className="border-b border-slate-800 text-[10px] text-slate-400 uppercase">
-                <th className="pb-2">Timestamp</th>
-                <th className="pb-2">Actor</th>
-                <th className="pb-2">School Tenant</th>
-                <th className="pb-2">Action</th>
-                <th className="pb-2">Status</th>
+          <table className="w-full text-left text-[12px] font-mono border border-[#e0e0e0] rounded-[10px] overflow-hidden">
+            <thead className="bg-[#f5f5f7]">
+              <tr className="border-b border-[#e0e0e0] text-[11px] text-[#7a7a7a] uppercase font-semibold">
+                <th className="py-2.5 px-3">Timestamp</th>
+                <th className="py-2.5 px-3">Actor</th>
+                <th className="py-2.5 px-3">School Tenant</th>
+                <th className="py-2.5 px-3">Action</th>
+                <th className="py-2.5 px-3">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <tbody className="divide-y divide-[#e0e0e0] text-[#1d1d1f]">
               {auditLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-800/30">
-                  <td className="py-2 text-[10px] text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                  <td className="py-2 text-white font-bold">{log.actorId} ({log.actorRole})</td>
-                  <td className="py-2 text-orange-400">{log.schoolId}</td>
-                  <td className="py-2">{log.action}</td>
-                  <td className="py-2">
+                <tr key={log.id} className="hover:bg-[#fafafc] transition-colors">
+                  <td className="py-2.5 px-3 text-[#7a7a7a]">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                  <td className="py-2.5 px-3 font-semibold">{log.actorId} ({log.actorRole})</td>
+                  <td className="py-2.5 px-3 text-[#0066cc] font-medium">{log.schoolId}</td>
+                  <td className="py-2.5 px-3">{log.action}</td>
+                  <td className="py-2.5 px-3">
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-2 py-0.5 rounded-[4px] text-[10px] font-semibold uppercase ${
                         log.status === 'allowed'
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-rose-500/20 text-rose-400'
+                          ? 'bg-[#34c759]/10 text-[#34c759]'
+                          : 'bg-[#ff3b30]/10 text-[#ff3b30]'
                       }`}
                     >
-                      {log.status.toUpperCase()}
+                      {log.status}
                     </span>
                   </td>
                 </tr>

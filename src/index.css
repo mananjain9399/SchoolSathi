@@ -1,173 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 @import "tailwindcss";
 
 @layer base {
   :root {
-    --brand-primary: #f97316;
-    --brand-primary-dark: #ea580c;
-    --brand-warm-bg: #fffbf5;
-    --brand-sand: #fef7ee;
-    --brand-card: #ffffff;
-    --brand-text-dark: #1e293b;
-    --brand-text-muted: #64748b;
-    --brand-green: #10b981;
-    --brand-blue: #0284c7;
-    --brand-purple: #8b5cf6;
+    --apple-primary: #0066cc;
+    --apple-primary-focus: #0071e3;
+    --apple-ink: #1d1d1f;
+    --apple-ink-muted: #7a7a7a;
+    --apple-canvas: #ffffff;
+    --apple-parchment: #f5f5f7;
+    --apple-hairline: #e0e0e0;
+    --apple-surface-pearl: #fafafc;
   }
 
   body {
-    background-color: #fcf9f4;
-    color: #1e293b;
-    font-family: 'Baloo 2', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    touch-action: manipulation;
-    user-select: none;
-    -webkit-user-select: none;
+    @apply bg-[#f5f5f7] text-[#1d1d1f] antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.374px; /* Apple default body tracking */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.374px;
+    font-weight: 600;
   }
 }
 
-/* Animations for SchoolSathi */
-@keyframes floatGentle {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
+@layer components {
+  /* Headings */
+  .apple-display-hero {
+    @apply text-[56px] leading-[1.07] font-semibold tracking-[-0.02em];
   }
-  50% {
-    transform: translateY(-8px) rotate(0.8deg);
+  .apple-display-lg {
+    @apply text-[40px] leading-[1.1] font-semibold tracking-[-0.01em];
+  }
+  .apple-display-md {
+    @apply text-[34px] leading-[1.47] font-semibold tracking-[-0.374px];
+  }
+  .apple-tagline {
+    @apply text-[21px] leading-[1.19] font-semibold tracking-[0.231px];
+  }
+
+  /* Cards */
+  .apple-utility-card {
+    @apply bg-white border border-[#e0e0e0] text-[#1d1d1f] p-6;
+    border-radius: 18px;
+    box-shadow: none;
+  }
+  
+  .apple-glass-panel {
+    @apply bg-white/80 backdrop-blur-xl border border-white/40;
+    border-radius: 18px;
+  }
+
+  /* Buttons */
+  .apple-btn-primary {
+    @apply bg-[#0066cc] text-white rounded-full px-[22px] py-[11px] text-[17px] font-normal transition-transform active:scale-95 flex items-center justify-center gap-2;
+  }
+  
+  .apple-btn-primary-small {
+    @apply bg-[#0066cc] text-white rounded-full px-4 py-2 text-[14px] font-normal transition-transform active:scale-95 flex items-center justify-center gap-1.5;
+  }
+
+  .apple-btn-secondary {
+    @apply bg-[#fafafc] text-[#1d1d1f] border border-[#f0f0f0] rounded-full px-[22px] py-[11px] text-[17px] font-normal transition-all hover:bg-[#f0f0f0] active:scale-95 flex items-center justify-center gap-2;
+  }
+  
+  .apple-btn-utility {
+    @apply bg-[#1d1d1f] text-white rounded-[8px] px-[15px] py-[8px] text-[14px] font-normal transition-transform active:scale-95 flex items-center justify-center gap-1.5;
+  }
+  
+  .apple-btn-ghost {
+    @apply bg-transparent text-[#0066cc] rounded-full px-4 py-2 text-[14px] font-normal transition-transform hover:bg-[#0066cc]/10 active:scale-95 flex items-center justify-center gap-1.5;
+  }
+  
+  .apple-icon-btn {
+    @apply w-11 h-11 rounded-full bg-[#d2d2d7]/60 text-[#1d1d1f] flex items-center justify-center transition-transform active:scale-95;
+  }
+
+  /* Nav */
+  .apple-global-nav {
+    @apply bg-black/90 backdrop-blur-md text-[#f5f5f7] h-[44px] flex items-center justify-center px-4 text-[12px];
+  }
+  
+  .apple-sub-nav {
+    @apply bg-[#f5f5f7]/80 backdrop-blur-md text-[#1d1d1f] h-[52px] flex items-center px-4 border-b border-[#e0e0e0];
+  }
+
+  /* Inputs */
+  .apple-search-input {
+    @apply bg-white text-[#1d1d1f] border border-[#e0e0e0] rounded-full px-5 py-3 h-[44px] text-[17px] focus:outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3] w-full;
   }
 }
 
-@keyframes listeningPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.45);
-  }
-  70% {
-    box-shadow: 0 0 0 24px rgba(249, 115, 22, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
-  }
+/* Base animations */
+.animate-in {
+  animation: animate-in 0.3s ease-out;
 }
 
-@keyframes thinkingRotate {
-  0% {
-    transform: rotate(0deg) scale(1);
-  }
-  50% {
-    transform: rotate(180deg) scale(1.15);
-  }
-  100% {
-    transform: rotate(360deg) scale(1);
-  }
-}
-
-@keyframes speakingMouth {
-  0%, 100% {
-    transform: scaleY(0.4);
-  }
-  50% {
-    transform: scaleY(1.3);
-  }
-}
-
-@keyframes happyBounce {
-  0%, 100% {
-    transform: translateY(0) scale(1);
-  }
-  30% {
-    transform: translateY(-14px) scale(1.05, 0.95);
-  }
-  60% {
-    transform: translateY(-6px) scale(0.98, 1.02);
-  }
-}
-
-@keyframes celebrateJiggle {
-  0%, 100% {
-    transform: translateY(-10px) rotate(-3deg) scale(1.05);
-  }
-  50% {
-    transform: translateY(-18px) rotate(3deg) scale(1.08);
-  }
-}
-
-@keyframes soundWave {
-  0%, 100% {
-    height: 8px;
-  }
-  50% {
-    height: 32px;
-  }
-}
-
-@keyframes rippleMic {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1.6);
+@keyframes animate-in {
+  from {
     opacity: 0;
+    transform: translateY(10px);
   }
-}
-
-.animate-float {
-  animation: floatGentle 3.5s ease-in-out infinite;
-}
-
-.animate-listening-pulse {
-  animation: listeningPulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-.animate-thinking {
-  animation: thinkingRotate 3s linear infinite;
-}
-
-.animate-talking {
-  animation: speakingMouth 0.35s ease-in-out infinite alternate;
-}
-
-.animate-happy {
-  animation: happyBounce 1.2s ease-in-out infinite;
-}
-
-.animate-celebrate {
-  animation: celebrateJiggle 0.8s ease-in-out infinite;
-}
-
-.animate-ripple {
-  animation: rippleMic 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
-}
-
-/* Warm Clay / Card elevation utilities */
-.card-warm {
-  background: #ffffff;
-  border: 1px solid rgba(249, 115, 22, 0.12);
-  box-shadow: 0 8px 24px -4px rgba(249, 115, 22, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
-}
-
-.card-warm-interactive {
-  background: #ffffff;
-  border: 1.5px solid rgba(249, 115, 22, 0.15);
-  box-shadow: 0 10px 28px -6px rgba(249, 115, 22, 0.1), 0 2px 8px -2px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.card-warm-interactive:active {
-  transform: scale(0.98);
-}
-
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #fed7aa;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #fdba74;
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

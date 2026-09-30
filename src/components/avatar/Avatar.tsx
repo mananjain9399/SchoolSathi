@@ -103,14 +103,14 @@ export const Avatar: React.FC<AvatarProps> = ({
 
   // State label translation badge
   const stateLabels: Record<string, { text: string; color: string; icon: string }> = {
-    idle: { text: 'Sathi Ready', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: '✨' },
-    listening: { text: 'Listening...', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: '👂' },
-    thinking: { text: 'Thinking...', color: 'bg-amber-100 text-amber-800 border-amber-300', icon: '💡' },
-    speaking: { text: 'Speaking...', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: '🗣️' },
-    happy: { text: 'Happy', color: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: '😊' },
-    concerned: { text: 'Attention', color: 'bg-rose-100 text-rose-800 border-rose-300', icon: '⚠️' },
-    celebrating: { text: 'Brilliant!', color: 'bg-purple-100 text-purple-800 border-purple-300', icon: '🎉' },
-    error: { text: 'Please retry', color: 'bg-red-100 text-red-800 border-red-300', icon: '❓' },
+    idle: { text: 'READY', color: 'bg-[#303030] text-[#969696] border-[#303030]', icon: '✨' },
+    listening: { text: 'LISTENING', color: 'bg-[#da291c]/15 text-[#da291c] border-[#da291c]/30', icon: '👂' },
+    thinking: { text: 'THINKING', color: 'bg-[#303030] text-white border-[#303030]', icon: '💡' },
+    speaking: { text: 'SPEAKING', color: 'bg-[#4c98b9]/15 text-[#4c98b9] border-[#4c98b9]/30', icon: '🗣️' },
+    happy: { text: 'HAPPY', color: 'bg-[#03904a]/15 text-[#03904a] border-[#03904a]/30', icon: '😊' },
+    concerned: { text: 'ATTENTION', color: 'bg-[#da291c]/15 text-[#da291c] border-[#da291c]/30', icon: '⚠️' },
+    celebrating: { text: 'BRILLIANT', color: 'bg-[#303030] text-white border-[#303030]', icon: '🎉' },
+    error: { text: 'RETRY', color: 'bg-[#da291c]/15 text-[#da291c] border-[#da291c]/30', icon: '❓' },
   };
 
   const activeLabel = stateLabels[normState] || stateLabels.idle;
@@ -125,12 +125,12 @@ export const Avatar: React.FC<AvatarProps> = ({
       role="img"
       aria-label={`SchoolSathi companion (${effectivePersona}) in ${normState} state`}
     >
-      {/* Listening radiating soundwave rings */}
+      {/* Listening radiating rings — Rosso Corsa */}
       {normState === 'listening' && (
         <>
-          <div className="absolute inset-0 rounded-full bg-orange-400/20 animate-ping pointer-events-none" />
-          <div className="absolute -inset-4 rounded-full border-2 border-orange-400/40 animate-pulse pointer-events-none" />
-          <div className="absolute -inset-8 rounded-full border border-orange-300/30 animate-pulse delay-150 pointer-events-none" />
+          <div className="absolute inset-0 rounded-full bg-[#da291c]/20 animate-ping pointer-events-none" />
+          <div className="absolute -inset-4 rounded-full border-2 border-[#da291c]/30 animate-pulse pointer-events-none" />
+          <div className="absolute -inset-8 rounded-full border border-[#da291c]/20 animate-pulse delay-150 pointer-events-none" />
         </>
       )}
 

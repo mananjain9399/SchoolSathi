@@ -58,87 +58,81 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
     SpeechService.speak(result.spokenResponse, effectiveLang, rateMap[newSpeed]);
   };
 
-  return (
-    <div className="w-full bg-white rounded-3xl p-5 shadow-xl border-2 border-orange-200 animate-in slide-in-from-bottom-4 duration-300 relative select-none">
+  const categoryIcon: Record<string, string> = {
+    'all-children': '👨‍👧‍👦',
+    homework: '📚',
+    exams: '📝',
+    attendance: '📅',
+    progress: '📈',
+    holidays: '🏖️',
+    timetable: '⏰',
+    'child-info': '🎒',
+    announcements: '📢',
+    general: '📢',
+  };
+
+    <div className="apple-utility-card w-full animate-in slide-in-from-bottom-4 duration-300 relative select-none shadow-sm">
       {/* Top Bar with Category Badge, Language Tag, and Close */}
-      <div className="flex items-center justify-between pb-3 border-b border-orange-100 flex-wrap gap-2">
+      <div className="flex items-center justify-between pb-3 border-b border-[#e0e0e0] flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xl">
-            {result.category === 'all-children'
-              ? '👨‍👧‍👦'
-              : result.category === 'homework'
-              ? '📚'
-              : result.category === 'exams'
-              ? '📝'
-              : result.category === 'attendance'
-              ? '📅'
-              : result.category === 'progress'
-              ? '📈'
-              : result.category === 'holidays'
-              ? '🏖️'
-              : result.category === 'timetable'
-              ? '⏰'
-              : result.category === 'child-info'
-              ? '🎒'
-              : '📢'}
+          <span className="text-[20px]">
+            {categoryIcon[result.category] || '📢'}
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-black uppercase tracking-wider text-orange-700 bg-orange-100/70 px-2.5 py-0.5 rounded-full">
-              {result.intent || (result.category === 'all-children' ? 'All Children Update' : result.category)}
+            <span className="text-[10px] font-semibold bg-[#f0f0f0] text-[#7a7a7a] px-2 py-0.5 rounded-full uppercase">
+              {result.intent || (result.category === 'all-children' ? 'ALL CHILDREN' : result.category?.toUpperCase())}
             </span>
-            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1 shadow-2xs">
+            <span className="text-[10px] font-semibold bg-[#0066cc]/10 text-[#0066cc] px-2 py-0.5 rounded-full uppercase">
               ✓ Based on school records
             </span>
             {langObj && (
-              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1">
-                <Globe className="w-3 h-3 text-blue-600" />
-                <span>{langObj.name} {result.isAutoDetected ? '(Auto-detected)' : ''}</span>
+              <span className="text-[10px] font-semibold bg-[#f0f0f0] text-[#7a7a7a] px-2 py-0.5 rounded-full flex items-center gap-1 uppercase">
+                <Globe className="w-3 h-3" />
+                <span>{langObj.name} {result.isAutoDetected ? '(AUTO)' : ''}</span>
               </span>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="apple-icon-btn w-8 h-8"
+          aria-label="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Query asked by parent */}
       {result.query && (
-        <div className="pt-2 text-[11px] font-semibold text-slate-400 italic">
+        <div className="pt-3 text-[12px] font-medium text-[#7a7a7a] italic">
           You asked: "{result.query}"
         </div>
       )}
 
-      {/* Main Spoken Message in Speech Bubble Style */}
-      <div className="py-2.5" role="status" aria-live="polite">
-        <p className="text-base sm:text-lg font-bold text-slate-800 leading-snug">
+      {/* Main Spoken Message */}
+      <div className="py-3" role="status" aria-live="polite">
+        <p className="text-[17px] font-medium text-[#1d1d1f] leading-snug">
           "{result.spokenResponse}"
         </p>
       </div>
 
       {/* Visual Confirmation for Homework */}
       {!result.isMultiChild && result.category === 'homework' && Array.isArray(result.detailedData) && result.detailedData.length > 0 && (
-        <div className="my-3 space-y-2 border-t border-orange-100 pt-3" id="homework-visual-confirmation">
+        <div className="my-3 space-y-2 border-t border-[#e0e0e0] pt-3" id="homework-visual-confirmation">
           <div className="flex items-center justify-between pb-1">
-            <span className="text-xs font-black text-orange-950 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-[12px] font-semibold text-[#1d1d1f] uppercase flex items-center gap-1.5">
               <span className="text-sm">📚</span>
               <span>
                 {result.intent === 'HOMEWORK_TOMORROW'
-                  ? 'HOMEWORK FOR TOMORROW'
+                  ? 'Homework for Tomorrow'
                   : result.intent === 'HOMEWORK_TODAY'
-                  ? 'HOMEWORK FOR TODAY'
-                  : 'HOMEWORK DETAILS'}
+                  ? 'Homework for Today'
+                  : 'Homework Details'}
               </span>
             </span>
             {result.studentName && (
-              <span className="text-[11px] font-bold text-orange-800 bg-orange-100/80 px-2.5 py-0.5 rounded-full border border-orange-200">
+              <span className="text-[10px] font-semibold bg-[#f0f0f0] text-[#1d1d1f] px-2 py-0.5 rounded-full">
                 👦 {result.studentName}
               </span>
             )}
@@ -148,30 +142,30 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
             {result.detailedData.map((hw: any, idx: number) => (
               <div
                 key={hw.id || idx}
-                className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/90 shadow-2xs hover:shadow-xs transition-shadow"
+                className="p-4 bg-[#fafafc] border border-[#e0e0e0] rounded-[14px]"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-black text-amber-950 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-xs" />
+                  <span className="text-[14px] font-semibold text-[#1d1d1f] flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#0066cc] inline-block" />
                     {hw.subject}
                   </span>
                   {hw.title && (
-                    <span className="text-xs font-bold text-amber-900 bg-amber-100/90 px-2.5 py-0.5 rounded-md border border-amber-200">
+                    <span className="text-[10px] font-semibold bg-[#e0e0e0] text-[#7a7a7a] px-2 py-0.5 rounded-full">
                       {hw.title}
                     </span>
                   )}
                 </div>
                 {hw.description && (
-                  <p className="text-xs font-semibold text-slate-700 mt-1.5 bg-white/95 p-2.5 rounded-xl border border-amber-100/80 shadow-2xs">
+                  <p className="text-[14px] font-normal text-[#1d1d1f] mt-2 bg-white p-3 border border-[#e0e0e0] rounded-[10px]">
                     {hw.description}
                   </p>
                 )}
                 {hw.dueDate && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 mt-1.5">
+                  <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#7a7a7a] mt-2">
                     <span>📅 Due:</span>
-                    <span className="font-bold text-slate-700">{hw.dueDate}</span>
+                    <span className="text-[#1d1d1f]">{hw.dueDate}</span>
                     {hw.teacherName && (
-                      <span className="ml-auto text-slate-400 font-normal">
+                      <span className="ml-auto">
                         Teacher: {hw.teacherName}
                       </span>
                     )}
@@ -183,16 +177,16 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
         </div>
       )}
 
-      {/* Accessibility Large Audio Controls Row with Replay, Stop, Ask Again */}
-      <div className="py-2.5 flex items-center gap-2 flex-wrap bg-orange-50/70 p-3 rounded-2xl border border-orange-200/80">
+      {/* Audio Controls Row */}
+      <div className="py-3 flex items-center gap-2 flex-wrap bg-[#fafafc] p-3 border border-[#e0e0e0] rounded-[14px] mt-2">
         {/* Replay Button */}
         <button
           onClick={handleReplay}
           id="btn-replay-audio"
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer"
+          className="apple-btn-secondary px-4 py-2 text-[14px]"
           title="Replay audio"
         >
-          <Volume2 className="w-4 h-4 animate-pulse" />
+          <Volume2 className="w-4 h-4" />
           <span>Replay</span>
         </button>
 
@@ -200,10 +194,10 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
         <button
           onClick={handleStop}
           id="btn-stop-audio"
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
+          className="apple-btn-secondary px-4 py-2 text-[14px]"
           title="Stop audio playback"
         >
-          <Square className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
+          <Square className="w-3.5 h-3.5 fill-current" />
           <span>Stop</span>
         </button>
 
@@ -212,7 +206,7 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
           <button
             onClick={onSpeakAgain}
             id="btn-ask-again"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer"
+            className="apple-btn-primary-small px-4 py-2 text-[14px]"
             title="Ask another question"
           >
             <Mic className="w-4 h-4" />
@@ -225,31 +219,31 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
           <button
             onClick={onRetry}
             id="btn-retry-audio"
-            className="flex items-center gap-1 px-3 py-2 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-200 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+            className="apple-btn-secondary px-4 py-2 text-[14px]"
             title="Retry query"
           >
-            <RotateCw className="w-3.5 h-3.5 text-orange-600" />
+            <RotateCw className="w-4 h-4" />
             <span>Retry</span>
           </button>
         )}
 
-        {/* Speed Toggle: Slow / Normal / Fast */}
+        {/* Speed Toggle */}
         <button
           onClick={handleToggleSpeed}
           id="btn-speed-toggle"
-          className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 text-xs font-extrabold shadow-2xs transition-all active:scale-95 cursor-pointer ml-auto"
-          title="Toggle speed: Slow vs Normal vs Fast"
+          className="apple-btn-ghost px-3 py-2 text-[14px] ml-auto"
+          title="Toggle speed"
         >
-          <span>{currentSpeed === 'slow' ? '🐢 Slow (0.8x)' : currentSpeed === 'fast' ? '🐇 Fast (1.25x)' : '⚡ Normal (1.0x)'}</span>
+          <span>{currentSpeed === 'slow' ? '0.8×' : currentSpeed === 'fast' ? '1.25×' : '1.0×'}</span>
         </button>
       </div>
 
       {/* Multi-Child Aggregated Cards View */}
       {result.isMultiChild && Array.isArray(result.detailedData) && (
-        <div className="mt-3 space-y-2.5 border-t border-slate-100 pt-3">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-orange-600" />
-            Child-by-Child Breakdown:
+        <div className="mt-4 space-y-3 border-t border-[#e0e0e0] pt-4">
+          <span className="text-[12px] font-semibold text-[#1d1d1f] uppercase flex items-center gap-1.5">
+            <Users className="w-4 h-4 text-[#0066cc]" />
+            Child-by-Child Breakdown
           </span>
 
           {result.detailedData.map((item: any, idx: number) => {
@@ -260,57 +254,57 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
             return (
               <div
                 key={idx}
-                className="p-3.5 rounded-2xl bg-orange-50/40 border border-orange-100/80 space-y-1.5"
+                className="p-4 bg-[#fafafc] border border-[#e0e0e0] rounded-[14px] space-y-2"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg bg-orange-200 text-orange-900 font-bold text-xs flex items-center justify-center">
+                    <span className="w-8 h-8 rounded-full bg-[#0066cc] text-white font-semibold text-[14px] flex items-center justify-center">
                       {childName.charAt(0)}
                     </span>
-                    <span className="text-xs font-black text-slate-900">
-                      {childName} ({childClass} - {childSection})
+                    <span className="text-[14px] font-semibold text-[#1d1d1f]">
+                      {childName} <span className="font-normal text-[#7a7a7a]">({childClass}-{childSection})</span>
                     </span>
                   </div>
                   {item.child?.presentToday !== undefined && (
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-full uppercase ${
                         item.child.presentToday
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-rose-100 text-rose-800'
+                          ? 'bg-[#34c759]/10 text-[#34c759]'
+                          : 'bg-[#ff3b30]/10 text-[#ff3b30]'
                       }`}
                     >
-                      {item.child.presentToday ? 'Present Today ✓' : 'Absent'}
+                      {item.child.presentToday ? 'Present ✓' : 'Absent'}
                     </span>
                   )}
                   {item.presentToday !== undefined && !item.child && (
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-full uppercase ${
                         item.presentToday
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-rose-100 text-rose-800'
+                          ? 'bg-[#34c759]/10 text-[#34c759]'
+                          : 'bg-[#ff3b30]/10 text-[#ff3b30]'
                       }`}
                     >
-                      {item.presentToday ? 'Present Today ✓' : 'Absent'}
+                      {item.presentToday ? 'Present ✓' : 'Absent'}
                     </span>
                   )}
                 </div>
 
                 {/* Show homework or exam details if available in item.data */}
                 {Array.isArray(item.data) && item.data.length > 0 && (
-                  <div className="bg-white/80 rounded-xl p-2 border border-orange-100/60 text-xs">
+                  <div className="bg-white p-3 border border-[#e0e0e0] rounded-[10px] text-[14px]">
                     {item.data[0].subject && (
-                      <span className="font-extrabold text-orange-900 block">
+                      <span className="font-semibold text-[#1d1d1f] block">
                         {item.data[0].subject}: {item.data[0].title}
                       </span>
                     )}
                     {item.data[0].description && (
-                      <p className="text-[11px] text-slate-600 mt-0.5">
+                      <p className="text-[#1d1d1f] mt-1">
                         {item.data[0].description}
                       </p>
                     )}
                     {item.data[0].date && (
-                      <p className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                        📅 {item.data[0].date} ({item.data[0].time || ''})
+                      <p className="text-[12px] text-[#7a7a7a] mt-1 font-medium">
+                        📅 {item.data[0].date} {item.data[0].time ? `(${item.data[0].time})` : ''}
                       </p>
                     )}
                   </div>
@@ -323,24 +317,24 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
 
       {/* Single Child Exams preview */}
       {!result.isMultiChild && result.category === 'exams' && Array.isArray(result.detailedData) && (
-        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Exam Schedule:
+        <div className="mt-4 space-y-3 border-t border-[#e0e0e0] pt-4">
+          <span className="text-[12px] font-semibold text-[#1d1d1f] uppercase flex items-center gap-1.5">
+            📝 Exam Schedule
           </span>
           {result.detailedData.map((ex: any) => (
-            <div key={ex.id} className="p-3 rounded-2xl bg-amber-50/50 border border-amber-200">
+            <div key={ex.id} className="p-4 bg-[#fafafc] border border-[#e0e0e0] rounded-[14px]">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-800">{ex.subject}: {ex.title}</span>
-                <span className="text-xs font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md">
-                  {ex.totalMarks} Marks
+                <span className="text-[14px] font-semibold text-[#1d1d1f]">{ex.subject}: {ex.title}</span>
+                <span className="text-[10px] font-semibold bg-[#e0e0e0] text-[#7a7a7a] px-2 py-0.5 rounded-full">
+                  {ex.totalMarks} MARKS
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-600 mt-1">
-                <Calendar className="w-3.5 h-3.5 text-amber-600" />
+              <div className="flex items-center gap-2 text-[12px] font-medium text-[#7a7a7a] mt-1.5">
+                <Calendar className="w-4 h-4 text-[#0066cc]" />
                 <span>{ex.date} ({ex.time})</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1 bg-white p-2 rounded-xl border border-amber-100">
-                <span className="font-semibold text-slate-700">Syllabus:</span> {ex.syllabus}
+              <p className="text-[14px] text-[#1d1d1f] mt-2 bg-white p-3 border border-[#e0e0e0] rounded-[10px]">
+                <span className="font-semibold">Syllabus:</span> {ex.syllabus}
               </p>
             </div>
           ))}
@@ -349,25 +343,25 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
 
       {/* Single Child Attendance preview */}
       {!result.isMultiChild && result.category === 'attendance' && result.detailedData && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200">
-              <span className="text-xl font-extrabold text-emerald-700">
+        <div className="mt-4 border-t border-[#e0e0e0] pt-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="p-4 bg-[#fafafc] border border-[#e0e0e0] rounded-[14px]">
+              <span className="text-[28px] font-semibold text-[#34c759]">
                 {result.detailedData.overallPercentage || 94}%
               </span>
-              <p className="text-[11px] font-semibold text-emerald-800">Attendance</p>
+              <p className="text-[12px] font-medium text-[#7a7a7a] uppercase mt-1">Attendance</p>
             </div>
-            <div className="p-2.5 rounded-2xl bg-blue-50 border border-blue-200">
-              <span className="text-xl font-extrabold text-blue-700">
+            <div className="p-4 bg-[#fafafc] border border-[#e0e0e0] rounded-[14px]">
+              <span className="text-[28px] font-semibold text-[#0066cc]">
                 {result.detailedData.presentDays || 88}
               </span>
-              <p className="text-[11px] font-semibold text-blue-800">Days Present</p>
+              <p className="text-[12px] font-medium text-[#7a7a7a] uppercase mt-1">Present</p>
             </div>
-            <div className="p-2.5 rounded-2xl bg-rose-50 border border-rose-200">
-              <span className="text-xl font-extrabold text-rose-700">
+            <div className="p-4 bg-[#fafafc] border border-[#e0e0e0] rounded-[14px]">
+              <span className="text-[28px] font-semibold text-[#ff3b30]">
                 {result.detailedData.absentDays || 6}
               </span>
-              <p className="text-[11px] font-semibold text-rose-800">Absences</p>
+              <p className="text-[12px] font-medium text-[#7a7a7a] uppercase mt-1">Absences</p>
             </div>
           </div>
         </div>
