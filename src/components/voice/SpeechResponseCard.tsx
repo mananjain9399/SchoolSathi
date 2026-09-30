@@ -71,6 +71,7 @@ export const SpeechResponseCard: React.FC<SpeechResponseCardProps> = ({
     general: '📢',
   };
 
+  return (
     <div className="apple-utility-card w-full animate-in slide-in-from-bottom-4 duration-300 relative select-none shadow-sm">
       {/* Top Bar with Category Badge, Language Tag, and Close */}
       <div className="flex items-center justify-between pb-3 border-b border-[#e0e0e0] flex-wrap gap-2">
